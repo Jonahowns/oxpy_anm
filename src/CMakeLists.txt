@@ -118,6 +118,7 @@ SET(interactions_SOURCES
 	Interactions/PatchyInteractionDan.cpp
 	Interactions/KFInteraction.cpp
 	Interactions/CustomInteraction.cpp
+	Interactions/ANMInteraction.cpp
 )
 
 SET(move_SOURCES
@@ -173,6 +174,7 @@ SET(common_SOURCES
 	Particles/SpheroCylinder.cpp
 	Particles/CustomParticle.cpp
 	Particles/Molecule.cpp
+	Particles/ANMParticle.cpp
 	Managers/SimManager.cpp
 	Utilities/OrderParameters.cpp
 	Utilities/Weights.cpp
@@ -270,7 +272,7 @@ ELSE()
 	SET(common_SOURCES
 		${common_SOURCES}
 		Utilities/Timings.cpp
-	)
+            Interactions/ANMInteraction.cpp Interactions/ANMInteraction.h Particles/ANMParticle.cpp Particles/ANMParticle.h)
 
 	ADD_EXECUTABLE(${exe_name} ${oxDNA_SOURCES})
 	ADD_EXECUTABLE(DNAnalysis ${DNAnalysis_SOURCES})

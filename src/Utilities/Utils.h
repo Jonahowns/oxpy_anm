@@ -30,6 +30,8 @@ namespace Utils {
 
 int decode_base(char c);
 char encode_base(int b);
+int decode_aa(char c);
+char encode_aa(int b);
 
 number gaussian();
 number gamma(number alpha, number beta);
