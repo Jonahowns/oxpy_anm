@@ -64,7 +64,6 @@ public:
 
 
 number ANMInteraction::_repulsive_lj_quart(const LR_vector &r, LR_vector &force, bool update_forces) {
-
     number rnorm = SQR(r.x) + SQR(r.y) + SQR(r.z);
     number energy = (number) 0;
     if(rnorm < SQR(_rc)) {
@@ -76,7 +75,7 @@ number ANMInteraction::_repulsive_lj_quart(const LR_vector &r, LR_vector &force,
         }
         else {
             number tmp = SQR(_sigma) / rnorm;
-            number lj_part = tmp * tmp * tmp;
+            number lj_part = CUB(tmp);
             energy = 4 * EXCL_EPS * (SQR(lj_part) - lj_part);
             if(update_forces) force = -r* (24 * EXCL_EPS * (lj_part - 2*SQR(lj_part))/rnorm);
         }
@@ -101,18 +100,20 @@ number ANMInteraction::_exc_volume(BaseParticle *p, BaseParticle *q, bool comput
 }
 
 number ANMInteraction::_spring(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
-    number eqdist;
+
     std::pair <int,int> keys (std::min(p->index, q->index), std::max(p->index, q->index));
-    eqdist = this->_rknot[keys];
+
     //Harmonic Spring Potential
     number _k = this->_potential[keys].second; //stiffness of the spring
-    number rnorm = _computed_r.norm();
-    number rinsta = sqrt(rnorm);
-    number energy = 0.5 * _k * SQR(rinsta-eqdist);
+//    if(p->index == 1 && q->index == 2)
+//        printf("eqdist %f spring %f", eqdist, _k);
+    number rinsta = _computed_r.module();
+    number disp = rinsta - _rknot[keys]; // current distance - eqdistance
+    number energy = 0.5 * _k * SQR(disp);
 
     if (update_forces) {
         LR_vector force(_computed_r);
-        force *= (-1.0f * _k ) * (rinsta-eqdist)/rinsta;
+        force *= (-1.0f * _k ) * disp/rinsta;
 
         p->force -= force;
         q->force += force;

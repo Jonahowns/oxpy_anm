@@ -64,6 +64,7 @@ void ANMInteraction::get_settings(input_file &inp) {
 
 
 void ANMInteraction::init() {
+    _sqr_rcut = 0.12454; //_rc ^2
     _sigma = 0.35f;
     _rstar = 0.349f;
     _b = 306484596.421f;
@@ -117,6 +118,7 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
         std::stringstream ss(line);
         ss >> strand >> aminoacid >> nside >> cside;
         // This sets the format officially to read from N to C Terminus
+        printf("%s", aminoacid);
 
         int x;
         std::set<int> myneighs;
@@ -133,24 +135,34 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
         }
         auto *p = dynamic_cast<ANMParticle*>(particles[i]);
 
+
         if(strlen(aminoacid) == 1) {
-            p->btype = Utils::decode_aa(aminoacid[0]);
+            p->type = Utils::decode_aa(aminoacid[0]);
+
         }
 
         // add_bonded_neighbor fills affected vector for us
         if (nside < 0)
             p->n3 = P_VIRTUAL;
         else
-            p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[nside]) );
+            p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[nside]));
         if (cside < 0)
             p->n5 = P_VIRTUAL;
         else
-            p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[cside]) );
+            p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[cside]));
 
         for(auto & k : myneighs)
         {
             if(p->index < k) p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[k]) );
         }
+
+        if(p->index == 1){  // Check affected vector
+            printf("Particle 1\n");
+            for(auto & pair : p->affected){
+                printf("%d %d", pair.first->index, pair.second->index);
+            }
+        }
+
 
         if(p->type == A_INVALID) throw oxDNAException("Particle #%d in strand #%d contains a non valid base '%c'. Aborting", i, strand, aminoacid);
         // store the strand id
@@ -181,9 +193,9 @@ number ANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool c
     auto *cp = dynamic_cast< ANMParticle * > (p);
     number energy;
     if ((*cp).is_bonded(q))
-        energy = pair_interaction_nonbonded(p, q, compute_r, update_forces);
-    else
         energy = pair_interaction_bonded(p, q, compute_r, update_forces);
+    else
+        energy = pair_interaction_nonbonded(p, q, compute_r, update_forces);
 
     return energy;
 }
@@ -204,8 +216,10 @@ number ANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticle 
     if(compute_r) {
         _computed_r = _box->min_image(p->pos, q->pos);
     }
-
-    number energy = this->_exc_volume(p, q, compute_r, update_forces);
+    if(_computed_r.norm() >= _sqr_rcut) {
+        return (number) 0;
+    }
+    number energy = _exc_volume(p, q, compute_r, update_forces);
     return energy;
 }
 

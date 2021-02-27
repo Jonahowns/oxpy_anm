@@ -26,10 +26,11 @@ __global__ void first_step_mixed(float4 *poss, GPU_quat *orientations, LR_double
 	float4 F = forces[IND];
 
 	LR_double4 v = velsd[IND];
+	const c_number scale_factor = MD_dt[0] * 0.5f * masses[IND];
 
-	v.x += F.x * MD_dt[0] * 0.5f;
-	v.y += F.y * MD_dt[0] * 0.5f;
-	v.z += F.z * MD_dt[0] * 0.5f;
+	v.x += F.x * scale_factor;
+	v.y += F.y * scale_factor;
+	v.z += F.z * scale_factor;
 
 	velsd[IND] = v;
 
@@ -48,9 +49,9 @@ __global__ void first_step_mixed(float4 *poss, GPU_quat *orientations, LR_double
 		float4 T = torques[IND];
 		LR_double4 L = Lsd[IND];
 		
-		L.x += T.x * MD_dt[0] * 0.5f;
-		L.y += T.y * MD_dt[0] * 0.5f;
-		L.z += T.z * MD_dt[0] * 0.5f;
+		L.x += T.x * scale_factor;
+		L.y += T.y * scale_factor;
+		L.z += T.z * scale_factor;
 		
 		Lsd[IND] = L;
 		
@@ -70,10 +71,11 @@ __global__ void second_step_mixed(LR_double4 *velsd, LR_double4 *Lsd, float4 *fo
 
 	float4 F = forces[IND];
 	LR_double4 v = velsd[IND];
+    const c_number scale_factor = MD_dt[0] * 0.5f * masses[IND];
 
-	v.x += (F.x * MD_dt[0] * 0.5f);
-	v.y += (F.y * MD_dt[0] * 0.5f);
-	v.z += (F.z * MD_dt[0] * 0.5f);
+	v.x += (F.x * scale_factor);
+	v.y += (F.y * scale_factor);
+	v.z += (F.z * scale_factor);
 
 	velsd[IND] = v;
 
@@ -81,9 +83,9 @@ __global__ void second_step_mixed(LR_double4 *velsd, LR_double4 *Lsd, float4 *fo
 		float4 T = torques[IND];
 		LR_double4 L = Lsd[IND];
 		
-		L.x += (T.x * MD_dt[0] * 0.5f);
-		L.y += (T.y * MD_dt[0] * 0.5f);
-		L.z += (T.z * MD_dt[0] * 0.5f);
+		L.x += (T.x * scale_factor);
+		L.y += (T.y * scale_factor);
+		L.z += (T.z * scale_factor);
 		
 		Lsd[IND] = L;
 	}

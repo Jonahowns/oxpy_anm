@@ -29,6 +29,8 @@ BaseParticle::BaseParticle() :
 	torque = LR_vector(0., 0., 0.);
 	btype = 0;
 	next_particle = P_INVALID;
+	mass = 1.0;
+	massinverted = 1.0;
 }
 
 void BaseParticle::copy_from(const BaseParticle &p) {

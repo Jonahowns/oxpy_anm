@@ -58,6 +58,9 @@ protected:
 	bool *_d_are_lists_old;
 
 	std::shared_ptr<CUDABaseInteraction> _cuda_interaction = nullptr;
+	int* _h_masstype, _d_masstype;
+	c_number* _h_massvalues, _d_massvalues;
+    std::string _massfile;
 
 	virtual void _host_to_gpu();
 	virtual void _gpu_to_host();
@@ -75,6 +78,7 @@ public:
 
 	virtual void get_settings(input_file &inp);
 	virtual void init_cuda();
+	void load_massfile(std::string &filename);
 };
 
 #endif /* CUDABASEBACKEND_H_ */

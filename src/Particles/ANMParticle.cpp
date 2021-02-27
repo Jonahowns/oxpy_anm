@@ -29,6 +29,6 @@ void ANMParticle::add_bonded_neighbor(ANMParticle *nn) {
 
 
 bool ANMParticle::is_bonded(BaseParticle *q) {
-    ANMParticle *Cq = dynamic_cast<ANMParticle *>(q);
+    auto *Cq = dynamic_cast<ANMParticle *>(q);
     return !(bonded_neighs.find(Cq) == bonded_neighs.end());
 }

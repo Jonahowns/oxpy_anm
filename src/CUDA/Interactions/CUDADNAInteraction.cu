@@ -27,6 +27,7 @@ void CUDADNAInteraction::get_settings(input_file &inp) {
 	std::string inter_type;
 	if(getInputString(&inp, "interaction_type", inter_type, 0) == KEY_FOUND) {
 		if(inter_type.compare("DNA2") == 0) {
+		    this->
 			_use_debye_huckel = true;
 			_use_oxDNA2_coaxial_stacking = true;
 			_use_oxDNA2_FENE = true;

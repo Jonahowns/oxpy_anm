@@ -29,6 +29,9 @@ CUDABaseBackend::CUDABaseBackend() :
 
 	_sqr_verlet_skin = 0.f;
 
+	_masstype = NULL;
+	_massvalues = NULL;
+	_massfile = "default.txt";
 	_cuda_lists = NULL;
 	_d_poss = NULL;
 	_d_bonds = NULL;
@@ -113,6 +116,13 @@ void CUDABaseBackend::get_settings(input_file &inp) {
 	else {
 		OX_LOG(Logger::LOG_INFO, "Using CUDA device %d", _device_number);
 	}
+
+    if(getInputString(&inp, "massfile", &_massfile, 0) == KEY_NOT_FOUND) {
+        OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
+        load_massfile("default.txt");
+    } else {
+        load_massfile(_massfile);
+    }
 
 	if(getInputInt(&inp, "CUDA_sort_every", &_sort_every, 0) == KEY_NOT_FOUND) {
 		OX_LOG(Logger::LOG_INFO, "CUDA sort_every not specified, using 0");
@@ -276,5 +286,15 @@ void CUDABaseBackend::_sort_index() {
 		<<<_particles_kernel_cfg.blocks, _particles_kernel_cfg.threads_per_block>>>
 		(_d_sorted_hindex, _d_inv_sorted_hindex);
 }
+
+void __host__ CUDABaseBackend::load_massfile(int &filename) {
+    std::fstream mass_stream;
+    mass_stream.open(filename, ios::in);
+    if(mass_stream.is_open())
+        while (mass_stream >> type >> mass){
+
+        }
+}
+
 
 #pragma GCC diagnostic pop

@@ -16,13 +16,13 @@ max_io = 4
 T = 0.1
 verlet_skin = 0.20
 sim_type = MD
-steps = 300000
+steps = 5
 
 ### MD PARAMS ###
 dt = 0.001
 newtonian_steps=51
 diff_coeff=1
-thermostat=langevin
+thermostat=john
 refresh_vel=1
 
 ### MC PARAMS ###
@@ -48,7 +48,7 @@ log_file = log.dat
 no_stdout_energy = 0
 restart_step_counter = 1
 energy_file = energy.dat
-print_conf_interval = 1000
-print_energy_every = 1000 
+print_conf_interval = 100000
+print_energy_every = 1
 time_scale = linear
 external_forces=0
