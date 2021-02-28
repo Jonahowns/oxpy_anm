@@ -29,9 +29,6 @@ CUDABaseBackend::CUDABaseBackend() :
 
 	_sqr_verlet_skin = 0.f;
 
-	_masstype = NULL;
-	_massvalues = NULL;
-	_massfile = "default.txt";
 	_cuda_lists = NULL;
 	_d_poss = NULL;
 	_d_bonds = NULL;
@@ -117,13 +114,6 @@ void CUDABaseBackend::get_settings(input_file &inp) {
 		OX_LOG(Logger::LOG_INFO, "Using CUDA device %d", _device_number);
 	}
 
-    if(getInputString(&inp, "massfile", &_massfile, 0) == KEY_NOT_FOUND) {
-        OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
-        load_massfile("default.txt");
-    } else {
-        load_massfile(_massfile);
-    }
-
 	if(getInputInt(&inp, "CUDA_sort_every", &_sort_every, 0) == KEY_NOT_FOUND) {
 		OX_LOG(Logger::LOG_INFO, "CUDA sort_every not specified, using 0");
 	}
@@ -207,7 +197,9 @@ void CUDABaseBackend::init_cuda() {
 	_orient_size = sizeof(GPU_quat) * N;
 	_bonds_size = sizeof(LR_bonds) * N;
 
+
 	// GPU memory allocations
+    CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number4>(&_d_massarray, sizeof(c_number) * N));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number4>(&_d_poss, _vec_size));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<LR_bonds>(&_d_bonds, _bonds_size));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<GPU_quat>(&_d_orientations, _orient_size));
@@ -224,6 +216,7 @@ void CUDABaseBackend::init_cuda() {
 	_h_poss = new c_number4[N];
 	_h_orientations = new GPU_quat[N];
 	_h_bonds = new LR_bonds[N];
+	_h_massarray = new c_number[N];
 
 	// setup kernels' configurations
 	_init_CUDA_kernel_cfgs();
@@ -287,14 +280,6 @@ void CUDABaseBackend::_sort_index() {
 		(_d_sorted_hindex, _d_inv_sorted_hindex);
 }
 
-void __host__ CUDABaseBackend::load_massfile(int &filename) {
-    std::fstream mass_stream;
-    mass_stream.open(filename, ios::in);
-    if(mass_stream.is_open())
-        while (mass_stream >> type >> mass){
-
-        }
-}
 
 
 #pragma GCC diagnostic pop

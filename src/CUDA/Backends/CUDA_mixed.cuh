@@ -26,7 +26,8 @@ __global__ void first_step_mixed(float4 *poss, GPU_quat *orientations, LR_double
 	float4 F = forces[IND];
 
 	LR_double4 v = velsd[IND];
-	const c_number scale_factor = MD_dt[0] * 0.5f * masses[IND];
+
+	const c_number scale_factor = MD_dt[0] * 0.5f / _d_masses[btype];
 
 	v.x += F.x * scale_factor;
 	v.y += F.y * scale_factor;

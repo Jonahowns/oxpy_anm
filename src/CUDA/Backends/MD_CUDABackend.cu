@@ -43,9 +43,13 @@ MD_CUDABackend::MD_CUDABackend() :
 	_use_edge = false;
 	_any_rigid_body = false;
 
+	_massvalues = _h_mass = _d_mass = nullptr; // mass arrays for variable Masses
+
 	_d_vels = _d_Ls = _d_forces = _d_torques = _d_buff_vels = nullptr;
 	_h_vels = _h_Ls = _h_forces = _h_torques = _d_buff_Ls = nullptr;
 	_h_gpu_index = _h_cpu_index = nullptr;
+
+	_massfile = "default.txt"
 
 	_d_particles_to_mols = _d_mol_sizes = nullptr;
 	_d_molecular_coms = nullptr;
@@ -72,6 +76,10 @@ MD_CUDABackend::MD_CUDABackend() :
 MD_CUDABackend::~MD_CUDABackend() {
 	if(_d_particles_to_mols != nullptr) {
 		CUDA_SAFE_CALL(cudaFree(_d_particles_to_mols));
+	}
+
+	if(_d_mass != nullptr) {
+	    CUDA_SAFE_CALL(cudaFree(_d_mass));
 	}
 
 	if(_d_vels != nullptr) {
@@ -103,6 +111,14 @@ MD_CUDABackend::~MD_CUDABackend() {
 		if(_d_ext_forces != nullptr) {
 			CUDA_SAFE_CALL(cudaFree(_d_ext_forces));
 		}
+	}
+
+	if(_massvalues != nullptr){
+	    delete[] _massvalues;
+	}
+
+	if(_h_mass != nullptr){
+	    delete[] _h_mass;
 	}
 
 	if(_h_vels != nullptr) {
@@ -154,6 +170,9 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 		if(p->btype != mybtype) {
 			throw oxDNAException("Could not treat the type (A, C, G, T or something specific) of particle %d; On CUDA, the maximum \"unique\" identity is 512");
 		}
+
+		_h_mass[i] = _h_massvalues[p->btype]; // fill mass array
+
 		if(p->index != myindex) {
 			throw oxDNAException("Could not treat the index of particle %d; remember that on CUDA the maximum c_number of particles is 2^21", p->index);
 		}
@@ -211,6 +230,7 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			}
 		}
 	}
+    CUDA_SAFE_CALL( cudaMemcpy(_d_massarray, _h_massarray, N()*sizeof(c_number), cudaMemcpyHostToDevice));
 	_host_to_gpu();
 }
 
@@ -303,7 +323,7 @@ void MD_CUDABackend::_init_CUDA_MD_symbols() {
 void MD_CUDABackend::_first_step() {
 	first_step
 		<<<_particles_kernel_cfg.blocks, _particles_kernel_cfg.threads_per_block>>>
-		(_d_poss, _d_orientations, _d_list_poss, _d_vels, _d_Ls, _d_forces, _d_torques, _d_are_lists_old);
+		(_d_mass, _d_poss, _d_orientations, _d_list_poss, _d_vels, _d_Ls, _d_forces, _d_torques, _d_are_lists_old);
 	CUT_CHECK_ERROR("_first_step error");
 }
 
@@ -418,7 +438,7 @@ void MD_CUDABackend::_forces_second_step() {
 
 	second_step
 		<<<_particles_kernel_cfg.blocks, _particles_kernel_cfg.threads_per_block>>>
-		(_d_vels, _d_Ls, _d_forces, _d_torques);
+		(_d_mass, _d_vels, _d_Ls, _d_forces, _d_torques);
 	CUT_CHECK_ERROR("second_step");
 }
 
@@ -518,6 +538,13 @@ void MD_CUDABackend::get_settings(input_file &inp) {
 		}
 	}
 
+    if(getInputString(&inp, "massfile", &_massfile, 1) == KEY_NOT_FOUND) {
+        OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
+        load_massfile("defaultmasses.txt");
+    } else {
+        load_massfile(_massfile);
+    }
+
 	getInputBool(&inp, "restart_step_counter", &_restart_step_counter, 1);
 	getInputBool(&inp, "CUDA_avoid_cpu_calculations", &_avoid_cpu_calculations, 0);
 	getInputBool(&inp, "CUDA_barostat_always_refresh", &_cuda_barostat_always_refresh, 0);
@@ -572,6 +599,8 @@ void MD_CUDABackend::init() {
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<int>(&_d_mol_sizes, sizeof(int) * _molecules.size()));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number4>(&_d_molecular_coms, sizeof(c_number4) * _molecules.size()));
 
+    CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number>(&_d_mass, sizeof(c_number) * N()));
+
 	CUDA_SAFE_CALL(cudaMemset(_d_forces, 0, _vec_size));
 	CUDA_SAFE_CALL(cudaMemset(_d_torques, 0, _vec_size));
 
@@ -580,6 +609,8 @@ void MD_CUDABackend::init() {
 	_h_Ls = new c_number4[N()];
 	_h_forces = new c_number4[N()];
 	_h_torques = new c_number4[N()];
+
+	_h_mass = new c_number[N()]; //variable masses
 
 	_obs_output_error_conf->init();
 
@@ -792,6 +823,22 @@ void MD_CUDABackend::init() {
 	}
 	_set_external_forces();
 	_cuda_interaction->compute_forces(_cuda_lists, _d_poss, _d_orientations, _d_forces, _d_torques, _d_bonds, _d_cuda_box);
+}
+
+void MD_CUDABackend::load_massfile(std::string &filename) {
+    std::fstream mass_stream;
+    int masstypes;
+    mass_stream.open(filename, ios::in);
+    if(mass_stream.is_open()) {
+        int type;
+        c_number mass;
+        mass_stream >> masstypes;
+        _massvalues = new c_number[masstypes]();
+        while (mass_stream >> type >> mass) {
+            _massvalues[type] = mass;
+        }
+    } else
+        throw oxDNAException("Could Not Load Mass File, Aborting");
 }
 
 #pragma GCC diagnostic pop

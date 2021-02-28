@@ -23,15 +23,11 @@ __device__ GPU_quat _get_updated_orientation(c_number4 &L, GPU_quat &old_o) {
 	return quat_multiply(old_o, R);
 }
 
-__global__ void first_step(map<int, c_number> c_number4 *poss, GPU_quat *orientations, c_number4 *list_poss, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques, bool *are_lists_old) {
+__global__ void first_step(c_number4 *masses, c_number4 *poss, GPU_quat *orientations, c_number4 *list_poss, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques, bool *are_lists_old) {
 	if(IND >= MD_N[0]) return;
 
-
-
 	const c_number4 F = forces[IND];
-    const int btype = get_particle_btype(poss[IND]);
-	const c_number m = masses[btype];
-	const c_number scale_factor = MD_dt[0] * (c_number) 0.5f * m;
+	const c_number scale_factor = MD_dt[0] * (c_number) 0.5f / masses[IND];
 
 	c_number4 r = poss[IND];
 	c_number4 v = vels[IND];
@@ -332,16 +328,17 @@ __global__ void set_external_forces(c_number4 *poss, GPU_quat *orientations, CUD
 	torques[IND] = T;
 }
 
-__global__ void second_step(c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques) {
+__global__ void second_step(c_number *masses, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques) {
 	if(IND >= MD_N[0]) return;
 
 	c_number4 F = forces[IND];
 	c_number4 v = vels[IND];
 
+    const c_number scale_factor = MD_dt[0] * (c_number) 0.5f / masses[IND];
 
-	v.x += F.x * MD_dt[0] * (c_number) 0.5f;
-	v.y += F.y * MD_dt[0] * (c_number) 0.5f;
-	v.z += F.z * MD_dt[0] * (c_number) 0.5f;
+	v.x += F.x * scale_factor;
+	v.y += F.y * scale_factor;
+	v.z += F.z * scale_factor;
 	v.w = (v.x*v.x + v.y*v.y + v.z*v.z) * (c_number) 0.5f;
 
 	vels[IND] = v;
@@ -349,9 +346,9 @@ __global__ void second_step(c_number4 *vels, c_number4 *Ls, c_number4 *forces, c
 	c_number4 T = torques[IND];
 	c_number4 L = Ls[IND];
 
-	L.x += T.x * MD_dt[0] * (c_number) 0.5f;
-	L.y += T.y * MD_dt[0] * (c_number) 0.5f;
-	L.z += T.z * MD_dt[0] * (c_number) 0.5f;
+	L.x += T.x * scale_factor;
+	L.y += T.y * scale_factor;
+	L.z += T.z * scale_factor;
 	L.w = (L.x*L.x + L.y*L.y + L.z*L.z) * (c_number) 0.5f;
 
 	Ls[IND] = L;

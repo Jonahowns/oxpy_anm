@@ -42,6 +42,7 @@ protected:
 	c_number4 *_d_Ls, *_h_Ls;
 	c_number4 *_d_forces, *_h_forces;
 	c_number4 *_d_torques, *_h_torques;
+	c_number4 *_d_mass, *_h_mass, _massvalues;
 
 	std::vector<int> _h_particles_to_mols;
 	int *_d_particles_to_mols, *_d_mol_sizes, *_d_buff_particles_to_mols;
@@ -56,6 +57,7 @@ protected:
 
 	ObservableOutput *_obs_output_error_conf;
 	std::string _error_conf_file;
+	std::string _massfile;
 
 	std::shared_ptr<CUDABaseThermostat> _cuda_thermostat;
 
@@ -86,6 +88,7 @@ public:
 	virtual ~MD_CUDABackend();
 
 	virtual void get_settings(input_file &inp);
+	virtual void load_massfile(string &filename);
 	virtual void init();
 
 	virtual void sim_step(llint curr_step);

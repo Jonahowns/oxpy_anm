@@ -118,7 +118,7 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
         std::stringstream ss(line);
         ss >> strand >> aminoacid >> nside >> cside;
         // This sets the format officially to read from N to C Terminus
-        printf("%s", aminoacid);
+        // Same format as most pdb files I've seen
 
         int x;
         std::set<int> myneighs;
@@ -135,10 +135,9 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
         }
         auto *p = dynamic_cast<ANMParticle*>(particles[i]);
 
-
         if(strlen(aminoacid) == 1) {
             p->type = Utils::decode_aa(aminoacid[0]);
-
+            p->btype = Utils::decode_aa(aminoacid[0]);
         }
 
         // add_bonded_neighbor fills affected vector for us
@@ -156,15 +155,8 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
             if(p->index < k) p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[k]) );
         }
 
-        if(p->index == 1){  // Check affected vector
-            printf("Particle 1\n");
-            for(auto & pair : p->affected){
-                printf("%d %d", pair.first->index, pair.second->index);
-            }
-        }
-
-
-        if(p->type == A_INVALID) throw oxDNAException("Particle #%d in strand #%d contains a non valid base '%c'. Aborting", i, strand, aminoacid);
+        if(p->type == A_INVALID || p->type == P_INVALID)
+            throw oxDNAException("Particle #%d in strand #%d contains a non valid base '%c'. Aborting", i, strand, aminoacid);
         // store the strand id
         // for a design inconsistency, in the topology file
         // strand ids for proteins start from 1, not from 0
