@@ -103,6 +103,7 @@ SET(interactions_SOURCES
 	Interactions/DNAInteraction.cpp
 	Interactions/DNA2Interaction.cpp
 	Interactions/DNANMInteraction.cpp
+	Interactions/RNANMInteraction.cpp
 	Interactions/DNAInteraction_nomesh.cpp
 	Interactions/DNAInteraction_relax.cpp
 	Interactions/RNAInteraction.cpp
