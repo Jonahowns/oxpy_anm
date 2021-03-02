@@ -16,9 +16,10 @@
 
 #include "../Particles/DNANucleotide.h"
 #include "../Particles/ANMParticle.h"
+#include "../Particles/ANMTParticle.h"
 
 
-DNANMInteraction::DNANMInteraction() : DNA2Interaction() { // @suppress("Class members should be properly initialized")
+DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress("Class members should be properly initialized")
     // TODO: Re-examine These
     //Protein Methods Function Pointers
     _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_spring;
@@ -37,11 +38,33 @@ DNANMInteraction::DNANMInteraction() : DNA2Interaction() { // @suppress("Class m
     _int_map[HYDROGEN_BONDING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_hydrogen_bonding;
     _int_map[NONBONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_nonbonded_excluded_volume;
     _int_map[DEBYE_HUCKEL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_debye_huckel;
+    _angular = btp;
+    _parameter_kbkt = false;
 }
 
 
 void DNANMInteraction::get_settings(input_file &inp){
     this->DNA2Interaction::get_settings(inp);
+
+    if(_angular){
+        float kb_tmp = -1.f;
+        float kt_tmp = -1.f;
+        getInputString(&inp, "parfile", _parameterfile, 1);
+        getInputFloat(&inp, "bending_k", &kb_tmp, 0);
+        _k_bend = (number) kb_tmp;
+
+        getInputFloat(&inp, "torsion_k", &kt_tmp, 0);
+        _k_tor = (number) kt_tmp;
+
+        if((_k_bend < 0 && kt_tmp >= 0) || (_k_tor < 0 && _k_bend >= 0)){
+            throw oxDNAException("Bending & Torsion Constants Must BOTH be set globally or in parameter file");
+        } else if(_k_bend >= 0 && _k_tor >= 0){
+            OX_LOG(Logger::LOG_INFO, "Using Global kb/kt values set in Input File");
+        } else if(_k_bend < 0 && _k_tor < 0){
+            OX_LOG(Logger::LOG_INFO, "No Global kb/kt values set in Input File, Attempting to read from Parameter File");
+            _parameter_kbkt = true;
+        }
+    }
 
     getInputString(&inp, "parfile", _parameterfile, 0);
     //Addition of Reading Parameter File
@@ -55,10 +78,21 @@ void DNANMInteraction::get_settings(input_file &inp){
         if(k < 0) throw oxDNAException("Spring Constant %f Not Supported", k);
     };
 
+    //Checkers as Lambdas
+    auto valid_angles = [](double a, double b, double c, double d)
+    {
+        double anglemin = std::min({a, b, c, d});
+        double anglemax = std::max({a, b, c, d});
+        if (anglemin < -1.0 || anglemax > 1.0){
+            throw oxDNAException("Cos of Angle in Parameter File not in Valid bounds");
+        }
+    };
+
     if(strcmp(_parameterfile, n) != 0) {
         int key1, key2;
         char potswitch;
         double potential, dist;
+        double a0, b0, c0, d0;
         int N;
         std::fstream parameters;
         parameters.open(_parameterfile, std::ios::in);
@@ -70,6 +104,21 @@ void DNANMInteraction::get_settings(input_file &inp){
             {
                 valid_spring_params(N, key1, key2, dist, potswitch, potential);
                 spring_connection_num += 1;
+
+                //If DNACT
+                if(_angular)
+                    if(key2 - key1 == 1){
+                        parameters >> a0 >> b0 >> c0 >> d0;
+                        valid_angles(a0, b0, c0, d0);
+                        if(_parameter_kbkt) {
+                            parameters >> _k_bend >> _k_tor;
+                            if(_k_bend < 0 || _k_tor < 0) throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File");
+                            std::pair <double, double> ang_constants (_k_bend, _k_tor);
+                            _ang_stiff[key1] = ang_constants;
+                        }
+                        std::vector<double> angles {a0, b0, c0, d0};
+                        _ang_vals[key1] = angles;
+                    }
                 std::pair <int, int> lkeys (key1, key2);
                 std::pair <char, double> pot (potswitch, potential);
                 _rknot[lkeys] = dist;
@@ -81,7 +130,11 @@ void DNANMInteraction::get_settings(input_file &inp){
             throw oxDNAException("ParameterFile Could Not Be Opened");
         }
         parameters.close();
-        if(spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
+        if (_angular){
+            if(spring_connection_num == 1 && N > 2 && _parameter_kbkt) throw oxDNAException("Invalid Parameter File Format, pairwise kb and kt values incorrectly formatted or missing");
+            if(spring_connection_num == 1 && N > 2 && !_parameter_kbkt) throw oxDNAException("Invalid Parameter File Format, global kb and kt values have been set in Inputfile");
+        } else if (spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
+
     } else {
         OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
     }
@@ -98,16 +151,23 @@ void DNANMInteraction::check_input_sanity(std::vector<BaseParticle*> &particles)
 void DNANMInteraction::allocate_particles(std::vector<BaseParticle*> &particles) {
     if (ndna==0 || ndnas==0) {
         OX_LOG(Logger::LOG_INFO, "No DNA Particles Specified, Continuing with just Protein Particles");
-        for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
+        if (_angular) for (int i = 0; i < npro; i++) particles[i] = new ANMTParticle();
+        else for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
+
     } else if (npro == 0) {
         OX_LOG(Logger::LOG_INFO, "No Protein Particles Specified, Continuing with just DNA Particles");
         for (int i = 0; i < ndna; i++) particles[i] = new DNANucleotide(this->_grooving);
     } else {
         if (_firststrand > 0){
             for (int i = 0; i < ndna; i++) particles[i] = new DNANucleotide(this->_grooving);
-            for (uint i = ndna; i < particles.size(); i++) particles[i] = new ANMParticle();
+            // Protein
+            if (_angular) for (uint i = ndna; i < particles.size(); i++) particles[i] = new ANMTParticle();
+            else for (uint i = ndna; i < particles.size(); i++) particles[i] = new ANMParticle();
         } else {
-            for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
+            // Protein
+            if (_angular) for (int i = 0; i < npro; i++) particles[i] = new ANMTParticle();
+            else for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
+
             for (uint i = npro; i < particles.size(); i++) particles[i] = new DNANucleotide(this->_grooving);
         }
     }
@@ -171,8 +231,23 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 }
                 myneighs.insert(x);
             }
+            BaseParticle *p = particles[i];
+            if (_angular) {
+                ANMTParticle* q = dynamic_cast< ANMTParticle * > (p);
+                for(auto & k : myneighs){
+                    if (p->index < k) {
+                        q->add_bonded_neighbor(dynamic_cast<ANMTParticle *> (particles[k]));
+                    }
+                }
 
-            auto *p = dynamic_cast< ANMParticle * > (particles[i]);
+            } else {
+                auto *q = dynamic_cast< ANMParticle * > (p);
+                for(auto & k : myneighs){
+                    if (p->index < k) {
+                        q->add_bonded_neighbor(dynamic_cast<ANMParticle *> (particles[k]));
+                    }
+                }
+            }
 
             if (strlen(aminoacid) == 1) {
                 p->type = Utils::decode_aa(aminoacid[0]);
@@ -181,12 +256,6 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
             p->strand_id = abs(strand) + ndnas - 1;
             p->index = i;
-
-            for(auto & k : myneighs){
-                if (p->index < k) {
-                    p->add_bonded_neighbor(dynamic_cast<ANMParticle *> (particles[k]));
-                }
-            }
 
             i++;
         }
@@ -277,6 +346,8 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         if (!(*cp).is_bonded(q)) return 0.f;
         number energy = _protein_spring(p, q, compute_r, update_forces);
         energy += _protein_exc_volume(p, q, compute_r, update_forces);
+        if(_angular)
+            if (q->index - p->index == 1) energy += _protein_ang_pot(p, q, compute_r, update_forces);
         return energy;
     } else
         return 0.f;
@@ -490,6 +561,74 @@ number DNANMInteraction::_protein_spring(BaseParticle *p, BaseParticle *q, bool 
 
     return energy;
 }
+
+number DNANMInteraction::_protein_ang_pot(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
+    // Get Angular Parameters
+    std::vector<double> &ang_params = _ang_vals[p->index];
+    double &a0 = ang_params[0];
+    double &b0 = ang_params[1];
+    double &c0 = ang_params[2];
+    double &d0 = ang_params[3];
+
+    if (_parameter_kbkt) { //Uses array with per particle kb and kt
+        _k_bend = this->_ang_stiff[p->index].first;
+        _k_tor = this->_ang_stiff[p->index].second;
+    } // If False, the global kb and kt will be used
+
+
+    LR_vector rij_unit = _computed_r;
+    rij_unit.normalize();
+    LR_vector rji_unit = rij_unit * -1.f;
+
+    LR_vector &a1 = p->orientationT.v1;
+    LR_vector &b1 = q->orientationT.v1;
+    LR_vector &a3 = p->orientationT.v3;
+    LR_vector &b3 = q->orientationT.v3;
+
+
+    double o1 = rij_unit * a1 - a0;
+    double o2 = rji_unit * b1 - b0;
+    double o3 = a1 * b1 - c0;
+    double o4 = a3 * b3 - d0;
+
+    //Torsion and Bending
+    number energy = _k_bend / 2 * (SQR(o1) + SQR(o2)) + _k_tor / 2 * (SQR(o3) + SQR(o4));
+
+    if (update_forces) {
+
+        LR_vector force = -(rji_unit.cross(rij_unit.cross(a1)) * _k_bend * o1 -
+                                    rji_unit.cross(rij_unit.cross(b1)) * _k_bend * o2) / _computed_r.module();
+
+        p->force -= force;
+        q->force += force;
+
+        LR_vector ta = rij_unit.cross(a1) * o1 * _k_bend;
+        LR_vector tb = rji_unit.cross(b1) * o2 * _k_bend;
+
+        p->torque += p->orientationT * ta;
+        q->torque += q->orientationT * tb;
+
+        LR_vector torsion = a1.cross(b1) * o3 * _k_tor + a3.cross(b3) * o4 * _k_tor;
+
+        p->torque += p->orientationT * -torsion;
+        q->torque += q->orientationT * torsion;
+
+        //For Debugging, very helpful for CUDA comparisons
+        /*LR_vector<number> TA = p->orientationT * (ta - torsion);
+        LR_vector<number> TB = q->orientationT * (tb + torsion);
+
+        if (p->index ==104){
+            printf("p2 Angular F %.7f %.7f %.7f TA %.7f %.7f %.7f\n", -force.x, -force.y, -force.z, TA.x, TA.y, TA.z);
+        } else if (q->index ==104){
+            printf("q2 Angular F %.7f %.7f %.7f TB %.7f %.7f %.7f\n", force.x, force.y, force.z, TB.x, TB.y, TB.z);
+        }*/
+
+    }
+
+    return energy;
+}
+
+
 
 DNANMInteraction::~DNANMInteraction() {
 }

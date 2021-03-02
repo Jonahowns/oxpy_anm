@@ -100,14 +100,14 @@ void RNANMInteraction::allocate_particles(std::vector<BaseParticle*> &particles)
         for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
     } else if (npro == 0) {
         OX_LOG(Logger::LOG_INFO, "No Protein Particles Specified, Continuing with just RNA Particles");
-        for (int i = 0; i < nrna; i++) particles[i] = new RNANucleotide(this->_grooving);
+        for (int i = 0; i < nrna; i++) particles[i] = new RNANucleotide();
     } else {
         if (_firststrand > 0){
-            for (int i = 0; i < nrna; i++) particles[i] = new RNANucleotide(this->_grooving);
+            for (int i = 0; i < nrna; i++) particles[i] = new RNANucleotide();
             for (uint i = nrna; i < particles.size(); i++) particles[i] = new ANMParticle();
         } else {
             for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
-            for (uint i = npro; i < particles.size(); i++) particles[i] = new RNANucleotide(this->_grooving);
+            for (uint i = npro; i < particles.size(); i++) particles[i] = new RNANucleotide();
         }
     }
 }

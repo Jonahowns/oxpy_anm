@@ -50,6 +50,9 @@ public:
     virtual void allocate_particles(std::vector<BaseParticle *> &particles);
 
     virtual void read_topology(int *N_strands, std::vector<BaseParticle *> &particles);
+    std::map<int, number> masses;
+    void load_massfile(std::string &massfile);
+    std::string _massfile;
 
     virtual number pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r = true, bool update_forces=false);
     virtual number pair_interaction_bonded(BaseParticle *p, BaseParticle *q, bool compute_r = true, bool update_forces=false);

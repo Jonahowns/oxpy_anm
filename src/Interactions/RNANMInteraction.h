@@ -21,7 +21,7 @@
 #ifndef RNANM_INTERACTION_H
 #define RNANM_INTERACTION_H
 
-#include "RNA2Interaction.h"
+#include "RNAInteraction2.h"
 
 
 class RNANMInteraction: public RNA2Interaction {

@@ -199,7 +199,6 @@ void CUDABaseBackend::init_cuda() {
 
 
 	// GPU memory allocations
-    CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number4>(&_d_massarray, sizeof(c_number) * N));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number4>(&_d_poss, _vec_size));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<LR_bonds>(&_d_bonds, _bonds_size));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<GPU_quat>(&_d_orientations, _orient_size));
@@ -216,7 +215,6 @@ void CUDABaseBackend::init_cuda() {
 	_h_poss = new c_number4[N];
 	_h_orientations = new GPU_quat[N];
 	_h_bonds = new LR_bonds[N];
-	_h_massarray = new c_number[N];
 
 	// setup kernels' configurations
 	_init_CUDA_kernel_cfgs();

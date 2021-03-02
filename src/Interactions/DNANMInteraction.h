@@ -37,6 +37,10 @@ protected:
     number _pro_base_sigma,_pro_base_rstar, _pro_base_b, _pro_base_rcut, _pro_base_stiffness;
     std::map<std::pair<int, int>, double> _rknot; //Both maps used just as they are in ACInteraction
     std::map<std::pair<int, int>, std::pair<char, double> > _potential;
+    bool _parameter_kbkt; //Controls whether kb/kt values are global or read from parameter file
+    std::map<int, std::pair<double, double> > _ang_stiff; // Stores per particle pair, kb kt values
+    number _k_bend, _k_tor;
+    std::map<int, std::vector <double> > _ang_vals;
     number _pro_sigma, _pro_rstar, _pro_b, _pro_rcut; // Protein-protein quartic LJ params same as in ANM
     number _pro_base_sqr_rcut, _pro_backbone_sqr_rcut, _pro_sqr_rcut, _pro_dna_sqr_rcut;
 
@@ -44,13 +48,15 @@ public:
     enum {
         SPRING = 8,
         PRO_EXC_VOL = 9,
-        PRO_DNA_EXC_VOL = 10
+        PRO_DNA_EXC_VOL = 10,
+        PRO_ANG_POT = 11
         //Assigned 8 9 and 10 so it won't overwrite the already existing DNA function pointers in the _int_map
     };
 
     char _parameterfile[500];
+    bool _angular;
 
-    DNANMInteraction();
+    DNANMInteraction(bool btp); //btn controls whether bending/torsion potential is applied
     virtual ~DNANMInteraction();
     virtual void get_settings(input_file &inp);
     virtual void allocate_particles(std::vector<BaseParticle *> &particles);
@@ -63,9 +69,10 @@ public:
     number _protein_dna_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness);
     virtual void check_input_sanity(std::vector<BaseParticle *> &particles);
     virtual void init();
-    number _protein_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces);
-    number _protein_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    virtual number _protein_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces);
+    virtual number _protein_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     virtual number _protein_spring(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    virtual number _protein_ang_pot(BaseParticle *p, BaseParticle*q, bool compute_r, bool update_forces);
 };
 
 #endif /* DNANM_INTERACTION_H */

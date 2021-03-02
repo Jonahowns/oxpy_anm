@@ -60,6 +60,15 @@ void ANMInteraction::get_settings(input_file &inp) {
     {
         throw oxDNAException("ParameterFile Could Not Be Opened");
     }
+
+    //Mass File Reading
+    if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) {
+        OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
+        std::string def = "../defaultmasses.txt";
+        load_massfile(def);
+    } else {
+        load_massfile(_massfile);
+    }
 }
 
 
@@ -138,6 +147,9 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
         if(strlen(aminoacid) == 1) {
             p->type = Utils::decode_aa(aminoacid[0]);
             p->btype = Utils::decode_aa(aminoacid[0]);
+            // mass only needs to be set if particle does not have a mass of 1, nucleotides mass =1 by convention
+            p->mass = masses[p->btype]; //set mass of each particle
+            p->massinverted = 1.f/p->mass; //this needs to be set manually as well
         }
 
         // add_bonded_neighbor fills affected vector for us
@@ -215,6 +227,20 @@ number ANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticle 
     return energy;
 }
 
+void ANMInteraction::load_massfile(std::string &filename) {
+    std::fstream mass_stream;
+    int masstypes;
+    mass_stream.open(filename, std::ios::in);
+    if(mass_stream.is_open()) {
+        int type;
+        number mass;
+        mass_stream >> masstypes;
+        while (mass_stream >> type >> mass) {
+            masses[type] = mass;
+        }
+    } else
+        throw oxDNAException("Could Not Load Mass File, Aborting");
+}
 
 void ANMInteraction::check_input_sanity(std::vector<BaseParticle *> &particles) {
 }

@@ -23,7 +23,7 @@ __device__ GPU_quat _get_updated_orientation(c_number4 &L, GPU_quat &old_o) {
 	return quat_multiply(old_o, R);
 }
 
-__global__ void first_step(c_number4 *masses, c_number4 *poss, GPU_quat *orientations, c_number4 *list_poss, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques, bool *are_lists_old) {
+__global__ void first_step(c_number *masses, c_number4 *poss, GPU_quat *orientations, c_number4 *list_poss, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques, bool *are_lists_old) {
 	if(IND >= MD_N[0]) return;
 
 	const c_number4 F = forces[IND];

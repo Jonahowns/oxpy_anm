@@ -177,6 +177,7 @@ SET(common_SOURCES
 	Particles/CustomParticle.cpp
 	Particles/Molecule.cpp
 	Particles/ANMParticle.cpp
+	Particles/ANMTParticle.cpp
 	Managers/SimManager.cpp
 	Utilities/OrderParameters.cpp
 	Utilities/Weights.cpp

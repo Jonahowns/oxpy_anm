@@ -71,7 +71,8 @@ InteractionPtr InteractionFactory::make_interaction(input_file &inp) {
 	else if(inter_type.compare("TEP") == 0) return std::make_shared<TEPInteraction>();
 	else if(inter_type.compare("Jordan") == 0) return std::make_shared<JordanInteraction>();
 	else if(inter_type.compare("AC") == 0) return std::make_shared<ANMInteraction>();
-	else if(inter_type.compare("DNANM") == 0) return std::make_shared<DNANMInteraction>();
+	else if(inter_type.compare("DNANM") == 0) return std::make_shared<DNANMInteraction>(false);
+	else if(inter_type.compare("DNACT") == 0) return std::make_shared<DNANMInteraction>(true);
 	else if(inter_type.compare("RNANM") == 0) return std::make_shared<RNANMInteraction>();
 	else {
 		InteractionPtr res = PluginManager::instance()->get_interaction(inter_type);

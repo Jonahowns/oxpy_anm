@@ -43,13 +43,15 @@ MD_CUDABackend::MD_CUDABackend() :
 	_use_edge = false;
 	_any_rigid_body = false;
 
-	_massvalues = _h_mass = _d_mass = nullptr; // mass arrays for variable Masses
+	_massvalues = nullptr;
+	_h_mass = nullptr;
+	_d_mass = nullptr; // mass arrays for variable Masses
 
 	_d_vels = _d_Ls = _d_forces = _d_torques = _d_buff_vels = nullptr;
 	_h_vels = _h_Ls = _h_forces = _h_torques = _d_buff_Ls = nullptr;
 	_h_gpu_index = _h_cpu_index = nullptr;
 
-	_massfile = "default.txt"
+//	_massfile = "default.txt";
 
 	_d_particles_to_mols = _d_mol_sizes = nullptr;
 	_d_molecular_coms = nullptr;
@@ -171,7 +173,7 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			throw oxDNAException("Could not treat the type (A, C, G, T or something specific) of particle %d; On CUDA, the maximum \"unique\" identity is 512");
 		}
 
-		_h_mass[i] = _h_massvalues[p->btype]; // fill mass array
+		_h_mass[i] = _massvalues[p->btype]; // fill mass array
 
 		if(p->index != myindex) {
 			throw oxDNAException("Could not treat the index of particle %d; remember that on CUDA the maximum c_number of particles is 2^21", p->index);
@@ -230,7 +232,7 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			}
 		}
 	}
-    CUDA_SAFE_CALL( cudaMemcpy(_d_massarray, _h_massarray, N()*sizeof(c_number), cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL( cudaMemcpy(_d_mass, _h_mass, N()*sizeof(c_number), cudaMemcpyHostToDevice));
 	_host_to_gpu();
 }
 
@@ -538,9 +540,10 @@ void MD_CUDABackend::get_settings(input_file &inp) {
 		}
 	}
 
-    if(getInputString(&inp, "massfile", &_massfile, 1) == KEY_NOT_FOUND) {
+    if(getInputString(&inp, "massfile", _massfile, 1) == KEY_NOT_FOUND) {
         OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
-        load_massfile("defaultmasses.txt");
+        std::string def = "defaultmasses.txt";
+        load_massfile(def);
     } else {
         load_massfile(_massfile);
     }
@@ -828,7 +831,7 @@ void MD_CUDABackend::init() {
 void MD_CUDABackend::load_massfile(std::string &filename) {
     std::fstream mass_stream;
     int masstypes;
-    mass_stream.open(filename, ios::in);
+    mass_stream.open(filename, std::ios::in);
     if(mass_stream.is_open()) {
         int type;
         c_number mass;
