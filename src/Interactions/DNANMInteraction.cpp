@@ -21,6 +21,8 @@
 
 DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress("Class members should be properly initialized")
     // TODO: Re-examine These
+
+    _angular = btp;
     //Protein Methods Function Pointers
     _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_spring;
     _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_spring;
@@ -28,6 +30,8 @@ DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress(
 
     //Protein-DNA Function Pointers
     _int_map[PRO_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_dna_exc_volume;
+
+    if(_angular) _int_map[PRO_ANG_POT] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_ang_pot;
 
     //DNA Methods Function Pointers
     _int_map[BACKBONE] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_backbone;
@@ -38,8 +42,13 @@ DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress(
     _int_map[HYDROGEN_BONDING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_hydrogen_bonding;
     _int_map[NONBONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_nonbonded_excluded_volume;
     _int_map[DEBYE_HUCKEL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_debye_huckel;
-    _angular = btp;
+
     _parameter_kbkt = false;
+
+    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f},
+              {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
+              {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
+              {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
 }
 
 
@@ -68,7 +77,6 @@ void DNANMInteraction::get_settings(input_file &inp){
 
     getInputString(&inp, "parfile", _parameterfile, 0);
     //Addition of Reading Parameter File
-    char n[5] = "none";
 
     auto valid_spring_params = [](int N, int x, int y, double d, char s, double k){
         if(x < 0 || x > N) throw oxDNAException("Invalid Particle ID %d in Parameter File", x);
@@ -88,7 +96,8 @@ void DNANMInteraction::get_settings(input_file &inp){
         }
     };
 
-    if(strcmp(_parameterfile, n) != 0) {
+    char n[5] = "none";
+    if(strcmp(_parameterfile, n) != 0 && strcmp(_parameterfile, "") != 0) {
         int key1, key2;
         char potswitch;
         double potential, dist;
@@ -233,7 +242,7 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             }
             BaseParticle *p = particles[i];
             if (_angular) {
-                ANMTParticle* q = dynamic_cast< ANMTParticle * > (p);
+                auto q = dynamic_cast< ANMTParticle * > (p);
                 for(auto & k : myneighs){
                     if (p->index < k) {
                         q->add_bonded_neighbor(dynamic_cast<ANMTParticle *> (particles[k]));
@@ -322,9 +331,15 @@ number DNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool
     if ((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) return this->pair_interaction_nonbonded(p, q, compute_r, update_forces);
 
     if (p->btype > 4 && q->btype > 4){
-        auto *cp = dynamic_cast< ANMParticle * > (p);
-        if ((*cp).is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
-        else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
+        if(_angular){
+            auto *cp = dynamic_cast< ANMTParticle * > (p);
+            if ((*cp).is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
+            else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
+        } else {
+            auto *cp = dynamic_cast< ANMParticle * > (p);
+            if ((*cp).is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
+            else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
+        }
     }
     return 0.f;
 }
@@ -342,13 +357,20 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         energy += _stacking(p,q,compute_r,update_forces);
         return energy;
     } else if (p->btype > 4 && q->btype > 4){
-        auto *cp = dynamic_cast< ANMParticle * > (p);
-        if (!(*cp).is_bonded(q)) return 0.f;
-        number energy = _protein_spring(p, q, compute_r, update_forces);
-        energy += _protein_exc_volume(p, q, compute_r, update_forces);
-        if(_angular)
+        if(_angular){
+            auto *cp = dynamic_cast< ANMTParticle * > (p);
+            if (!(*cp).is_bonded(q)) return 0.f;
+            number energy = _protein_spring(p, q, compute_r, update_forces);
+            energy += _protein_exc_volume(p, q, compute_r, update_forces);
             if (q->index - p->index == 1) energy += _protein_ang_pot(p, q, compute_r, update_forces);
-        return energy;
+            return energy;
+        } else {
+            auto *cp = dynamic_cast< ANMParticle * > (p);
+            if (!(*cp).is_bonded(q)) return 0.f;
+            number energy = _protein_spring(p, q, compute_r, update_forces);
+            energy += _protein_exc_volume(p, q, compute_r, update_forces);
+            return energy;
+        }
     } else
         return 0.f;
 
@@ -415,7 +437,7 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
     LR_vector r_to_base = rcenter  - nuc->int_centers[DNANucleotide::BASE];
 
     LR_vector torquenuc(0,0,0);
-    number energy;
+    auto energy = (number) 0.f;
 
     if(r_to_back.module() < _pro_backbone_sqr_rcut) {
         energy = _protein_dna_repulsive_lj(r_to_back, force, update_forces, _pro_backbone_sigma, _pro_backbone_b, _pro_backbone_rstar,_pro_backbone_rcut,_pro_backbone_stiffness);

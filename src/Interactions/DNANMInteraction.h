@@ -37,6 +37,7 @@ protected:
     number _pro_base_sigma,_pro_base_rstar, _pro_base_b, _pro_base_rcut, _pro_base_stiffness;
     std::map<std::pair<int, int>, double> _rknot; //Both maps used just as they are in ACInteraction
     std::map<std::pair<int, int>, std::pair<char, double> > _potential;
+    std::map<int, number> masses;
     bool _parameter_kbkt; //Controls whether kb/kt values are global or read from parameter file
     std::map<int, std::pair<double, double> > _ang_stiff; // Stores per particle pair, kb kt values
     number _k_bend, _k_tor;
@@ -53,7 +54,7 @@ public:
         //Assigned 8 9 and 10 so it won't overwrite the already existing DNA function pointers in the _int_map
     };
 
-    char _parameterfile[500];
+    char _parameterfile[512];
     bool _angular;
 
     DNANMInteraction(bool btp); //btn controls whether bending/torsion potential is applied

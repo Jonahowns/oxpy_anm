@@ -24,6 +24,11 @@ ANMInteraction::ANMInteraction() :
                 BaseInteraction<ANMInteraction>(){
     _int_map[SPRING_POTENTIAL] = &ANMInteraction::_spring;
     _int_map[EXC_VOL] = &ANMInteraction::_exc_volume;
+    // default mass array
+    masses = {{5, 1.f}, {6, 1.f}, {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},
+            {11, 1.f}, {12, 1.f}, {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f},
+            {17, 1.f}, {18, 1.f}, {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f},
+            {23, 1.f}, {24, 1.f}};
 }
 
 
@@ -35,7 +40,7 @@ ANMInteraction::~ANMInteraction() {
 void ANMInteraction::get_settings(input_file &inp) {
     IBaseInteraction::get_settings(inp);
     char parameterfile[500];
-    getInputString(&inp, "parfile", parameterfile, 0);
+    getInputString(&inp, "parfile", parameterfile, 1);
 
     //Addition of Reading Parameter File for ANMInteraction Only!
     int key1, key2;
@@ -63,9 +68,7 @@ void ANMInteraction::get_settings(input_file &inp) {
 
     //Mass File Reading
     if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) {
-        OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
-        std::string def = "../defaultmasses.txt";
-        load_massfile(def);
+        OX_LOG(Logger::LOG_INFO, "Using Default Mass Array");
     } else {
         load_massfile(_massfile);
     }
