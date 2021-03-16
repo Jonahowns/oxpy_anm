@@ -159,15 +159,15 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
         if (nside < 0)
             p->n3 = P_VIRTUAL;
         else
-            p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[nside]));
+            p->add_bonded_neighbor(particles[nside]);
         if (cside < 0)
             p->n5 = P_VIRTUAL;
         else
-            p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[cside]));
+            p->add_bonded_neighbor(particles[cside]);
 
         for(auto & k : myneighs)
         {
-            if(p->index < k) p->add_bonded_neighbor(dynamic_cast<ANMParticle  *> (particles[k]) );
+            if(p->index < k) p->add_bonded_neighbor(particles[k]);
         }
 
         if(p->type == A_INVALID || p->type == P_INVALID)
@@ -197,9 +197,8 @@ void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &p
 
 
 number ANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
-    auto *cp = dynamic_cast< ANMParticle * > (p);
     number energy;
-    if ((*cp).is_bonded(q))
+    if (p->is_bonded(q))
         energy = pair_interaction_bonded(p, q, compute_r, update_forces);
     else
         energy = pair_interaction_nonbonded(p, q, compute_r, update_forces);

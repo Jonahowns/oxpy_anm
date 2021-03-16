@@ -240,12 +240,14 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 }
                 myneighs.insert(x);
             }
+
             BaseParticle *p = particles[i];
+
             if (_angular) {
-                auto q = dynamic_cast< ANMTParticle * > (p);
+                auto *q = dynamic_cast< ANMTParticle * > (p);
                 for(auto & k : myneighs){
                     if (p->index < k) {
-                        q->add_bonded_neighbor(dynamic_cast<ANMTParticle *> (particles[k]));
+                        q->add_bonded_neighbor(particles[k]);
                     }
                 }
 
@@ -253,7 +255,7 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 auto *q = dynamic_cast< ANMParticle * > (p);
                 for(auto & k : myneighs){
                     if (p->index < k) {
-                        q->add_bonded_neighbor(dynamic_cast<ANMParticle *> (particles[k]));
+                        q->add_bonded_neighbor(particles[k]);
                     }
                 }
             }
@@ -332,12 +334,10 @@ number DNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool
 
     if (p->btype > 4 && q->btype > 4){
         if(_angular){
-            auto *cp = dynamic_cast< ANMTParticle * > (p);
-            if ((*cp).is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
+            if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
             else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
         } else {
-            auto *cp = dynamic_cast< ANMParticle * > (p);
-            if ((*cp).is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
+            if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
             else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
         }
     }
@@ -357,16 +357,14 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         energy += _stacking(p,q,compute_r,update_forces);
         return energy;
     } else if (p->btype > 4 && q->btype > 4){
-        if(_angular){
-            auto *cp = dynamic_cast< ANMTParticle * > (p);
-            if (!(*cp).is_bonded(q)) return 0.f;
+        if(_angular){;
+            if (!p->is_bonded(q)) return 0.f;
             number energy = _protein_spring(p, q, compute_r, update_forces);
             energy += _protein_exc_volume(p, q, compute_r, update_forces);
             if (q->index - p->index == 1) energy += _protein_ang_pot(p, q, compute_r, update_forces);
             return energy;
         } else {
-            auto *cp = dynamic_cast< ANMParticle * > (p);
-            if (!(*cp).is_bonded(q)) return 0.f;
+            if (!p->is_bonded(q)) return 0.f;
             number energy = _protein_spring(p, q, compute_r, update_forces);
             energy += _protein_exc_volume(p, q, compute_r, update_forces);
             return energy;

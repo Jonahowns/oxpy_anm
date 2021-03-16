@@ -22,7 +22,7 @@ public:
     virtual bool is_rigid_body() { return false; }
 
     virtual bool is_bonded(BaseParticle *q);
-    virtual void add_bonded_neighbor(ANMParticle *nn);
-    std::set<ANMParticle *> bonded_neighs;
+    virtual void add_bonded_neighbor(BaseParticle *nn);
+    std::vector<int> bonded_neighs;
 };
 #endif //ANM_PARTICLE_H

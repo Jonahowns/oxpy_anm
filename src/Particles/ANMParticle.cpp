@@ -6,7 +6,7 @@
 
 
 ANMParticle::ANMParticle() : BaseParticle()  {
-
+    this->bonded_neighs = {};
 }
 
 
@@ -15,10 +15,12 @@ ANMParticle::~ANMParticle() {
 }
 
 
-void ANMParticle::add_bonded_neighbor(ANMParticle *nn) {
+void ANMParticle::add_bonded_neighbor(BaseParticle *nn) {
     if(!is_bonded(nn)) {
-        bonded_neighs.insert(nn);
-        nn->bonded_neighs.insert(this);
+        auto *Cq = dynamic_cast<ANMParticle *>(nn);
+        bonded_neighs.push_back(Cq->index);
+
+        Cq->bonded_neighs.push_back(this->index);
 
         ParticlePair new_pair(this, nn);
         this->affected.push_back(new_pair);
@@ -29,6 +31,7 @@ void ANMParticle::add_bonded_neighbor(ANMParticle *nn) {
 
 
 bool ANMParticle::is_bonded(BaseParticle *q) {
-    auto *Cq = dynamic_cast<ANMParticle *>(q);
-    return !(bonded_neighs.find(Cq) == bonded_neighs.end());
+    std::vector<int>::iterator it;
+    it = find (bonded_neighs.begin(), bonded_neighs.end(), q->index);
+    return it != bonded_neighs.end();
 }
