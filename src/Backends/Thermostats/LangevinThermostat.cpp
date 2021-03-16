@@ -79,7 +79,7 @@ void LangevinThermostat::apply(std::vector<BaseParticle *> &particles, llint cur
 	for(auto p: particles) {
 		p->vel += _dt * (-_gamma_trans * p->vel + LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor_trans/sqrt(p->mass)); //added mass
 		if(p->is_rigid_body()) {
-			p->L += _dt * (-_gamma_rot * p->L + LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor_rot/sqrt(p->mass)); //added mass
+			p->L += _dt * (-_gamma_rot * p->L + LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor_rot); // ToDO *eventually* add inertia
 		}
 	}
 }

@@ -49,10 +49,11 @@ __global__ void first_step_mixed(float *masses, float4 *poss, GPU_quat *orientat
 	if(any_rigid_body) {
 		float4 T = torques[IND];
 		LR_double4 L = Lsd[IND];
-		
-		L.x += T.x * scale_factor;
-		L.y += T.y * scale_factor;
-		L.z += T.z * scale_factor;
+
+		// ToDO: add Inertia
+		L.x += T.x * MD_dt[0] * (number) 0.5;
+		L.y += T.y * MD_dt[0] * (number) 0.5;
+		L.z += T.z * MD_dt[0] * (number) 0.5;
 		
 		Lsd[IND] = L;
 		
@@ -72,18 +73,20 @@ __global__ void second_step_mixed(float* masses, LR_double4 *velsd, LR_double4 *
 
 	float4 F = forces[IND];
 	LR_double4 v = velsd[IND];
-    const c_number scale_factor = MD_dt[0] * 0.5f * masses[IND];
+    const c_number scale_factor = MD_dt[0] * 0.5f;
+    const c_number scale_factor_mass = MD_dt[0] * 0.5f * masses[IND];
 
-	v.x += (F.x * scale_factor);
-	v.y += (F.y * scale_factor);
-	v.z += (F.z * scale_factor);
+	v.x += (F.x * scale_factor_mass);
+	v.y += (F.y * scale_factor_mass);
+	v.z += (F.z * scale_factor_mass);
 
 	velsd[IND] = v;
 
 	if(any_rigid_body) {
 		float4 T = torques[IND];
 		LR_double4 L = Lsd[IND];
-		
+
+		// ToDO: add Inertia *eventually*
 		L.x += (T.x * scale_factor);
 		L.y += (T.y * scale_factor);
 		L.z += (T.z * scale_factor);

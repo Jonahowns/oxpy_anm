@@ -63,7 +63,7 @@ void BrownianThermostat::apply (std::vector<BaseParticle *> &particles, llint cu
 			p->vel = LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor/sqrt(pmass);
 		}
 		if(drand48() < _pr) {
-			p->L = LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor/sqrt(pmass);
+			p->L = LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor; // ToDO *eventually* add inertia
 		}
 	}
 }

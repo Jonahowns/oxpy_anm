@@ -27,7 +27,7 @@ __global__ void first_step(c_number *masses, c_number4 *poss, GPU_quat *orientat
 	if(IND >= MD_N[0]) return;
 
 	const c_number4 F = forces[IND];
-	const c_number scale_factor = MD_dt[0] * (c_number) 0.5f / masses[IND];
+	const c_number scale_factor = MD_dt[0] * (c_number) 0.5f / masses[IND]; //Store as inverse masses
 
 	c_number4 r = poss[IND];
 	c_number4 v = vels[IND];
@@ -46,9 +46,10 @@ __global__ void first_step(c_number *masses, c_number4 *poss, GPU_quat *orientat
 	const c_number4 T = torques[IND];
 	c_number4 L = Ls[IND];
 
-	L.x += T.x * scale_factor;
-	L.y += T.y * scale_factor;
-	L.z += T.z * scale_factor;
+    // To Do *eventually* add Inertia
+	L.x += T.x * MD_dt[0] * (c_number) 0.5f;
+	L.y += T.y * MD_dt[0] * (c_number) 0.5f;
+	L.z += T.z * MD_dt[0] * (c_number) 0.5f;
 
 	Ls[IND] = L;
 

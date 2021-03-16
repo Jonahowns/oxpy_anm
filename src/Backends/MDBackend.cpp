@@ -142,11 +142,13 @@ void MDBackend::_generate_vel() {
 
 	number initial_K = 0;
 	for(auto p: _particles) {
-	    number rescale_factor = sqrt(this->_T/p->mass); //added mass
+	    number rescale_factor = sqrt(this->_T);
+	    number rescale_factor_mass = sqrt(this->_T/p->mass); //added mass ToDO *eventually* add inertia
 
-		p->vel.x = Utils::gaussian() * rescale_factor;
-		p->vel.y = Utils::gaussian() * rescale_factor;
-		p->vel.z = Utils::gaussian() * rescale_factor;
+
+		p->vel.x = Utils::gaussian() * rescale_factor_mass;
+		p->vel.y = Utils::gaussian() * rescale_factor_mass;
+		p->vel.z = Utils::gaussian() * rescale_factor_mass;
 
 		p->L.x = Utils::gaussian() * rescale_factor;
 		p->L.y = Utils::gaussian() * rescale_factor;

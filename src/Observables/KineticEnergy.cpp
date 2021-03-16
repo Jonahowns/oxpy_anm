@@ -34,10 +34,10 @@ number KineticEnergy::get_kinetic_energy() {
 	number factor = 1.5 / _directions.size();
 	number K = 0.f;
 	for(auto p: _config_info->particles()) {
-		if(p->is_rigid_body()) K += p->mass * p->L.norm() * (number) 0.5f; //added mass
+		if(p->is_rigid_body()) K += p->L.norm() * (number) 0.5f; //ToDO add Inertia *eventually
 
 		for(auto dir: _directions) {
-			K += SQR(p->vel[dir]) * factor;
+			K += SQR(p->vel[dir]) * p->mass * factor;
 		}
 	}
 	K /= _config_info->N();
