@@ -25,7 +25,6 @@ DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress(
     _angular = btp;
     //Protein Methods Function Pointers
     _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_spring;
-    _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_spring;
     _int_map[PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_exc_volume;
 
     //Protein-DNA Function Pointers
@@ -333,13 +332,9 @@ number DNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool
     if ((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) return this->pair_interaction_nonbonded(p, q, compute_r, update_forces);
 
     if (p->btype > 4 && q->btype > 4){
-        if(_angular){
-            if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
-            else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
-        } else {
-            if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
-            else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
-        }
+        // ANM & ANMT call same functions here
+        if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
+        else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     }
     return 0.f;
 }
@@ -436,6 +431,8 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
 
     LR_vector torquenuc(0,0,0);
     auto energy = (number) 0.f;
+
+
 
     if(r_to_back.module() < _pro_backbone_sqr_rcut) {
         energy = _protein_dna_repulsive_lj(r_to_back, force, update_forces, _pro_backbone_sigma, _pro_backbone_b, _pro_backbone_rstar,_pro_backbone_rcut,_pro_backbone_stiffness);

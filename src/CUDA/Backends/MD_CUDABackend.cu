@@ -44,6 +44,11 @@ MD_CUDABackend::MD_CUDABackend() :
 	_any_rigid_body = false;
 
 	_massvalues = nullptr;
+
+	for(int i = 0; i < 24; i++){
+	    _defmasses[i] = 1.0;
+	}
+
 	_h_mass = nullptr;
 	_d_mass = nullptr; // mass arrays for variable Masses
 
@@ -133,6 +138,13 @@ MD_CUDABackend::~MD_CUDABackend() {
 	if(_obs_output_error_conf != nullptr) {
 		delete _obs_output_error_conf;
 	}
+
+//	delete[] _defmasses;
+
+	if(_massvalues != nullptr){
+	    delete[] _massvalues;
+	}
+
 }
 
 void MD_CUDABackend::_host_to_gpu() {
@@ -531,6 +543,7 @@ void MD_CUDABackend::get_settings(input_file &inp) {
 	MDBackend::get_settings(inp);
 	CUDABaseBackend::get_settings(inp);
 
+
 	if(getInputBool(&inp, "use_edge", &_use_edge, 0) == KEY_FOUND) {
 		if(_use_edge && sizeof(c_number) == sizeof(double)) {
 			throw oxDNAException("use_edge and double precision are not compatible");
@@ -540,10 +553,9 @@ void MD_CUDABackend::get_settings(input_file &inp) {
 		}
 	}
 
-    if(getInputString(&inp, "massfile", _massfile, 1) == KEY_NOT_FOUND) {
+    if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) {
         OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
-        std::string def = "defaultmasses.txt";
-        load_massfile(def);
+        _massvalues = _defmasses;
     } else {
         load_massfile(_massfile);
     }

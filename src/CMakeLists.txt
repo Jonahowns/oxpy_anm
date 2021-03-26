@@ -178,6 +178,7 @@ SET(common_SOURCES
 	Particles/Molecule.cpp
 	Particles/ANMParticle.cpp
 	Particles/ANMTParticle.cpp
+	Particles/ANMTParticle.cpp
 	Managers/SimManager.cpp
 	Utilities/OrderParameters.cpp
 	Utilities/Weights.cpp
@@ -239,6 +240,7 @@ IF(CUDA)
 		CUDA/Backends/MD_CUDABackend.cu
 		CUDA/Interactions/CUDABaseInteraction.cu
 		CUDA/Interactions/CUDADNAInteraction.cu
+		CUDA/Interactions/CUDADNANMInteraction.cu
 		CUDA/Interactions/CUDALJInteraction.cu
 		CUDA/Interactions/CUDARNAInteraction.cu
 		CUDA/Interactions/CUDAPatchyInteraction.cu
@@ -275,8 +277,7 @@ ELSE()
 	SET(common_SOURCES
 		${common_SOURCES}
 		Utilities/Timings.cpp
-            Interactions/ANMInteraction.cpp Interactions/ANMInteraction.h Particles/ANMParticle.cpp Particles/ANMParticle.h)
-
+	)
 	ADD_EXECUTABLE(${exe_name} ${oxDNA_SOURCES})
 	ADD_EXECUTABLE(DNAnalysis ${DNAnalysis_SOURCES})
 	ADD_LIBRARY(${lib_name} ${common_SOURCES})
