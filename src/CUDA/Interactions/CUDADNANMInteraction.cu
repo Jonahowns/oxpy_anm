@@ -12,7 +12,6 @@
 #include "CUDA_DNANM.cuh"
 #include "../Lists/CUDASimpleVerletList.h"
 #include "../Lists/CUDANoList.h"
-#include "../../Interactions/DNA2Interaction.h"
 #include "../../Interactions/DNANMInteraction.h"
 
 
@@ -74,9 +73,6 @@ CUDADNANMInteraction::~CUDADNANMInteraction() {
 
 
 void CUDADNANMInteraction::get_settings(input_file &inp) {
-    _use_debye_huckel = false;
-    _use_oxDNA2_coaxial_stacking = false;
-    _use_oxDNA2_FENE = false;
     std::string inter_type;
     if (getInputString(&inp, "parfile", _parameterfile, 0) != KEY_FOUND) {
         throw oxDNAException("Key 'parfile' not found. Necessary for Protein sims.");
@@ -85,43 +81,16 @@ void CUDADNANMInteraction::get_settings(input_file &inp) {
     char s[5] = "none";
     if(strcmp(this->_parameterfile, s) != 0) _read_par = true;
 
-    if (!getInputString(&inp, "topology", this->_topology_filename, 0) == KEY_FOUND){ //DO I NEED TOP?
+    if (!getInputString(&inp, "topology", this->_topology_filename, 0) == KEY_FOUND){
         throw oxDNAException("Key 'topology_file' not found.");
     }
-
-    _use_debye_huckel = true;
-    _use_oxDNA2_coaxial_stacking = true;
-    _use_oxDNA2_FENE = true;
-
-    //Functions Pointers implicit in DNANM Constructor Call
-
-// we don't need the F4_... terms as the macros are used in the CUDA_DNA.cuh file; this doesn't apply for the F2_K term
-    this->F2_K[1] = CXST_K_OXDNA2;
-    _debye_huckel_half_charged_ends = true;
-    this->_grooving = true;
-    // end copy from DNA2Interaction
-
-    // copied from DNA2Interaction::get_settings() (CPU), the least bad way of doing things
-    getInputNumber(&inp, "salt_concentration", &_salt_concentration, 1);
-    getInputBool(&inp, "dh_half_charged_ends", &_debye_huckel_half_charged_ends, 0);
-
-    // lambda-factor (the dh length at T = 300K, I = 1.0)
-    _debye_huckel_lambdafactor = 0.3616455f;
-    getInputFloat(&inp, "dh_lambda", &_debye_huckel_lambdafactor, 0);
-
-    // the prefactor to the Debye-Huckel term
-    _debye_huckel_prefactor = 0.0543f;
-    getInputFloat(&inp, "dh_strength", &_debye_huckel_prefactor, 0);
-    // End copy from DNA2Interaction
-
-//    this->DNANMInteraction::init();
-    this->DNANMInteraction::get_settings(inp);
-
+    DNANMInteraction::get_settings(inp);
 }
 
 
 void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
-    this->CUDABaseInteraction::cuda_init(box_side, N);
+    CUDABaseInteraction::cuda_init(box_side, N);
+    DNANMInteraction::init();
 
 //    Addition of Reading Parameter File -> Moved from get_settings due to needing to fill variables that are filled in the CPU version of DNANMInteraction::read_topology
     std::fstream top;
@@ -218,37 +187,34 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
                 _affected_len[key2] += 1;
                 //potswitch is currently unused but may be later
 
-                if (key2 - key1 == 1){
-                    //Angular Parameters
-                    parameters >> a0 >> b0 >> c0 >> d0;
-                    valid_angles(a0, b0, c0, d0);
-                    _h_ang_params[key1*4] = a0;
-                    _h_ang_params[key1*4+1] = b0;
-                    _h_ang_params[key1*4+2] = c0;
-                    _h_ang_params[key1*4+3] = d0;
+                if(_angular) {
+                    if (key2 - key1 == 1) {
+                        //Angular Parameters
+                        parameters >> a0 >> b0 >> c0 >> d0;
+                        valid_angles(a0, b0, c0, d0);
+                        _h_ang_params[key1 * 4] = a0;
+                        _h_ang_params[key1 * 4 + 1] = b0;
+                        _h_ang_params[key1 * 4 + 2] = c0;
+                        _h_ang_params[key1 * 4 + 3] = d0;
 
-                    if(_angular) {
-                        if(this->_parameter_kbkt) {
+
+                        if (this->_parameter_kbkt) {
                             parameters >> _kbend >> _ktor;
-                            if(_kbend < 0 || _ktor < 0) throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File. Check Par Formatting");
-                            _h_ang_kbkt[key1*2] = _kbend;
-                            _h_ang_kbkt[key1*2+1] = _ktor;
+                            if (_kbend < 0 || _ktor < 0)
+                                throw oxDNAException(
+                                        "Invalid pairwise kb/kt Value Declared in Parameter File. Check Par Formatting");
+                            _h_ang_kbkt[key1 * 2] = _kbend;
+                            _h_ang_kbkt[key1 * 2 + 1] = _ktor;
                         }
                     }
-
-                    _spring_potential[key1*this->npro + key2] = potential;
-                    _spring_eqdist[key1*this->npro + key2] = dist;
-
-                    _spring_potential[key2*this->npro + key1] = potential;
-                    _spring_eqdist[key2*this->npro + key1] = dist;
-
-                } else {
-                    _spring_potential[key1*this->npro + key2] = potential;
-                    _spring_eqdist[key1*this->npro + key2] = dist;
-
-                    _spring_potential[key2*this->npro + key1] = potential;
-                    _spring_eqdist[key2*this->npro + key1] = dist;
                 }
+
+                _spring_potential[key1*this->npro + key2] = potential;
+                _spring_eqdist[key1*this->npro + key2] = dist;
+
+                _spring_potential[key2*this->npro + key1] = potential;
+                _spring_eqdist[key2*this->npro + key1] = dist;
+
             }
             parameters.close();
         } else {
@@ -260,7 +226,7 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
         _h_affected = new int[spring_connection_num*2]();
         _h_aff_gamma = new c_number[spring_connection_num*2]();
         _h_aff_eqdist = new c_number[spring_connection_num*2]();
-        c_number zero = (c_number) 0.f;
+        auto zero = (c_number) 0.f;
         for(int i = 0; i < this->npro+1; i++) _h_affected_indx[i] = 0;
         for(int i = 0; i < spring_connection_num*2; i++){
             _h_affected[i] = 0;
@@ -342,7 +308,8 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
     } else OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
 
     // Copied from CUDADNAINTERACTION
-    this->DNAInteraction::init();
+    this->DNANMInteraction::init();
+//    DNAInteraction::init();
 
     float f_copy = this->_hb_multiplier;
     CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_hb_multi, &f_copy, sizeof(float)) );
@@ -384,44 +351,14 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
 
 
     if(this->_use_edge) CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_n_forces, &this->_n_forces, sizeof(int)) );
-    if (_use_debye_huckel) {
-        // copied from DNA2Interaction::init() (CPU), the least bad way of doing things
-        // We wish to normalise with respect to T=300K, I=1M. 300K=0.1 s.u. so divide this->_T by 0.1
-        c_number lambda = _debye_huckel_lambdafactor * sqrt(this->_T / 0.1f) / sqrt(_salt_concentration);
-        // RHIGH gives the distance at which the smoothing begins
-        _debye_huckel_RHIGH = 3.0 * lambda;
-        _minus_kappa = -1.0 / lambda;
 
-        // these are just for convenience for the smoothing parameter computation
-        c_number x = _debye_huckel_RHIGH;
-        c_number q = _debye_huckel_prefactor;
-        c_number l = lambda;
+    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_RC, &_debye_huckel_RC, sizeof(float)) );
+    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_RHIGH, &_debye_huckel_RHIGH, sizeof(float)) );
+    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_prefactor, &_debye_huckel_prefactor, sizeof(float)) );
+    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_B, &_debye_huckel_B, sizeof(float)) );
+    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_minus_kappa, &_minus_kappa, sizeof(float)) );
+    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_half_charged_ends, &_debye_huckel_half_charged_ends, sizeof(bool)) );
 
-        // compute the some smoothing parameters
-        _debye_huckel_B = -(exp(-x / l) * q * q * (x + l) * (x + l)) / (-4. * x * x * x * l * l * q);
-        _debye_huckel_RC = x * (q * x + 3. * q * l) / (q * (x + l));
-
-        c_number debyecut;
-        if (this->_grooving) {
-            debyecut = 2.0f * sqrt((POS_MM_BACK1) * (POS_MM_BACK1) + (POS_MM_BACK2) * (POS_MM_BACK2)) + _debye_huckel_RC;
-        } else {
-            debyecut = 2.0f * sqrt(SQR(POS_BACK)) + _debye_huckel_RC;
-        }
-
-        // the cutoff radius for the potential should be the larger of rcut and debyecut
-        if (debyecut > this->_rcut){
-            this->_rcut = debyecut;
-            this->_sqr_rcut = debyecut*debyecut;
-        }
-        //End copy from DNA2Interaction
-
-        CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_RC, &_debye_huckel_RC, sizeof(float)) );
-        CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_RHIGH, &_debye_huckel_RHIGH, sizeof(float)) );
-        CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_prefactor, &_debye_huckel_prefactor, sizeof(float)) );
-        CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_B, &_debye_huckel_B, sizeof(float)) );
-        CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_minus_kappa, &_minus_kappa, sizeof(float)) );
-        CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_half_charged_ends, &_debye_huckel_half_charged_ends, sizeof(bool)) );
-    }
     //Constants for DNA/Protein Interactions
     //NEW VERSION #QuarticExcludedVolume
     //Backbone-Protein Excluded Volume Parameters
@@ -508,17 +445,20 @@ void CUDADNANMInteraction::compute_forces(CUDABaseList *lists, c_number4 *d_poss
 
             if(_angular){
                 dnanm_forces_edge_bonded_angular
-                        << < this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >> >
+                        <<< this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >>>
                 (d_poss, d_orientations, d_forces, d_torques, d_bonds, this->_grooving, _use_oxDNA2_FENE, this->_use_mbf, this->_mbf_xmax, this->_mbf_finf, d_box, _d_aff_eqdist, _d_aff_gamma, _d_ang_params, _d_ang_kbkt, _d_affected_indx, _d_affected);
 
             } else {
                 dnanm_forces_edge_bonded
-                        << < this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >> >
+                        <<< this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >>>
                 (d_poss, d_orientations, d_forces, d_torques, d_bonds, this->_grooving, _use_oxDNA2_FENE, this->_use_mbf, this->_mbf_xmax, this->_mbf_finf, d_box, _d_aff_eqdist, _d_aff_gamma, _d_affected_indx, _d_affected);
-
             }
 
         } else throw oxDNAException("Edge Approach is only implemented for DNANM Interaction using CUDA approach. Please add use_edge = 1 to your input file.");
 
     } else throw oxDNAException("Must Use with Lists to run simulation");
+}
+
+void CUDADNANMInteraction::_on_T_update() {
+    cuda_init(_box_side, _N);
 }

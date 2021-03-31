@@ -42,8 +42,9 @@ protected:
 	c_number4 *_d_Ls, *_h_Ls;
 	c_number4 *_d_forces, *_h_forces;
 	c_number4 *_d_torques, *_h_torques;
-	c_number *_d_mass, *_h_mass, *_massvalues;
-    c_number _defmasses[24]; // default mass values
+	c_number *_d_mass, *_h_mass, *_massvalues; //required for different masses
+	// massvalues maps btype to mass value
+	// _h and _d _mass hold elementwise massvalues
 
 	std::vector<int> _h_particles_to_mols;
 	int *_d_particles_to_mols, *_d_mol_sizes, *_d_buff_particles_to_mols;

@@ -114,19 +114,21 @@ void DNANMInteraction::get_settings(input_file &inp){
                 spring_connection_num += 1;
 
                 //If DNACT
-                if(_angular)
-                    if(key2 - key1 == 1){
+                if(_angular) {
+                    if (key2 - key1 == 1) {
                         parameters >> a0 >> b0 >> c0 >> d0;
                         valid_angles(a0, b0, c0, d0);
-                        if(_parameter_kbkt) {
+                        if (_parameter_kbkt) {
                             parameters >> _k_bend >> _k_tor;
-                            if(_k_bend < 0 || _k_tor < 0) throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File");
-                            std::pair <double, double> ang_constants (_k_bend, _k_tor);
+                            if (_k_bend < 0 || _k_tor < 0)
+                                throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File");
+                            std::pair<double, double> ang_constants(_k_bend, _k_tor);
                             _ang_stiff[key1] = ang_constants;
                         }
-                        std::vector<double> angles {a0, b0, c0, d0};
+                        std::vector<double> angles{a0, b0, c0, d0};
                         _ang_vals[key1] = angles;
                     }
+                }
                 std::pair <int, int> lkeys (key1, key2);
                 std::pair <char, double> pot (potswitch, potential);
                 _rknot[lkeys] = dist;
@@ -138,10 +140,15 @@ void DNANMInteraction::get_settings(input_file &inp){
             throw oxDNAException("ParameterFile Could Not Be Opened");
         }
         parameters.close();
-        if (_angular){
-            if(spring_connection_num == 1 && N > 2 && _parameter_kbkt) throw oxDNAException("Invalid Parameter File Format, pairwise kb and kt values incorrectly formatted or missing");
-            if(spring_connection_num == 1 && N > 2 && !_parameter_kbkt) throw oxDNAException("Invalid Parameter File Format, global kb and kt values have been set in Inputfile");
-        } else if (spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
+        if (_angular) {
+            if (spring_connection_num == 1 && N > 2 && _parameter_kbkt)
+                throw oxDNAException(
+                        "Invalid Parameter File Format, pairwise kb and kt values incorrectly formatted or missing");
+            if (spring_connection_num == 1 && N > 2 && !_parameter_kbkt)
+                throw oxDNAException(
+                        "Invalid Parameter File Format, global kb and kt values have been set in Inputfile");
+        }
+//        } else if (!_angular && spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
 
     } else {
         OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
@@ -165,6 +172,7 @@ void DNANMInteraction::allocate_particles(std::vector<BaseParticle*> &particles)
     } else if (npro == 0) {
         OX_LOG(Logger::LOG_INFO, "No Protein Particles Specified, Continuing with just DNA Particles");
         for (int i = 0; i < ndna; i++) particles[i] = new DNANucleotide(this->_grooving);
+
     } else {
         if (_firststrand > 0){
             for (int i = 0; i < ndna; i++) particles[i] = new DNANucleotide(this->_grooving);
@@ -224,14 +232,21 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
         // Amino Acid
         if (strand < 0) {
+            BaseParticle *p = particles[i];
             char aminoacid[256];
             int nside, cside;
             ss >> aminoacid >> nside >> cside;
 
             int x;
             std::set<int> myneighs;
-            if (nside >= 0) myneighs.insert(nside);
-            if (cside >= 0) myneighs.insert(cside);
+            if (nside >= 0) {
+                myneighs.insert(nside);
+                p->n3 = particles[nside];
+            }
+            if (cside >= 0) {
+                myneighs.insert(cside);
+                p->n5 = particles[cside];
+            }
             while (ss.good()) {
                 ss >> x;
                 if (x < 0 || x >= my_N) {
@@ -239,8 +254,6 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 }
                 myneighs.insert(x);
             }
-
-            BaseParticle *p = particles[i];
 
             if (_angular) {
                 auto *q = dynamic_cast< ANMTParticle * > (p);
@@ -433,26 +446,34 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
     auto energy = (number) 0.f;
 
 
-
-    if(r_to_back.module() < _pro_backbone_sqr_rcut) {
+    if(r_to_back.norm() < _pro_backbone_sqr_rcut) {
         energy = _protein_dna_repulsive_lj(r_to_back, force, update_forces, _pro_backbone_sigma, _pro_backbone_b, _pro_backbone_rstar,_pro_backbone_rcut,_pro_backbone_stiffness);
         //printf("back-pro %d %d %f\n",p->index,q->index,energy);
         if (update_forces) {
-            torquenuc  -= nuc->int_centers[DNANucleotide::BACK].cross(force);
+            torquenuc = nuc->int_centers[DNANucleotide::BACK].cross(force);
             nuc->force -= force;
             protein->force += force;
+            if(_angular){
+                r_to_back.normalize();
+                protein->torque += (r_to_back*_pro_sigma/2).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+            }
+            nuc->torque += nuc->orientationT * torquenuc;
         }
     }
 
-    if(r_to_base.module() > _pro_base_sqr_rcut) return energy;
+    if(r_to_base.norm() < _pro_base_sqr_rcut){
+        energy += _protein_dna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
+        if(update_forces) {
+            torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(force);
+            nuc->torque += nuc->orientationT * torquenuc;
 
-    energy += _protein_dna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
-    if(update_forces) {
-        torquenuc  -= nuc->int_centers[DNANucleotide::BASE].cross(force);
-        nuc->torque += nuc->orientationT * torquenuc;
-
-        nuc->force -= force;
-        protein->force += force;
+            if(_angular){
+                r_to_base.normalize();
+                protein->torque += p->orientationT*(r_to_base*_pro_sigma/2).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+            }
+            nuc->force -= force;
+            protein->force += force;
+        }
     }
 
 
@@ -487,7 +508,7 @@ number DNANMInteraction::_protein_dna_repulsive_lj(const LR_vector &r, LR_vector
 
 
 void DNANMInteraction::init() {
-    this->DNA2Interaction::init();
+    DNA2Interaction::init();
     ndna=0, npro=0, ndnas =0;
     //let's try this
     _pro_backbone_sigma = 0.57f;
@@ -551,6 +572,10 @@ number DNANMInteraction::_protein_exc_volume(BaseParticle *p, BaseParticle *q, b
     {
         p->force -= force;
         q->force += force;
+        if(_angular){
+            p->torque += p->orientationT*(_computed_r/2).cross(-force);
+            q->torque += p->orientationT*(-_computed_r/2).cross(force);
+        }
     }
 
     return energy;

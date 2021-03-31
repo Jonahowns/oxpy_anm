@@ -43,108 +43,95 @@ MD_CUDABackend::MD_CUDABackend() :
 	_use_edge = false;
 	_any_rigid_body = false;
 
-	_massvalues = nullptr;
+	_massvalues = NULL;
+	_h_mass = NULL;
+	_d_mass = NULL; // mass arrays for variable Masses
 
-	for(int i = 0; i < 24; i++){
-	    _defmasses[i] = 1.0;
-	}
+	_d_vels = _d_Ls = _d_forces = _d_torques = _d_buff_vels = NULL;
+	_h_vels = _h_Ls = _h_forces = _h_torques = _d_buff_Ls = NULL;
+	_h_gpu_index = _h_cpu_index = NULL;
+	_massfile = "default.txt";
 
-	_h_mass = nullptr;
-	_d_mass = nullptr; // mass arrays for variable Masses
+	_d_particles_to_mols = _d_mol_sizes = NULL;
+	_d_molecular_coms = NULL;
 
-	_d_vels = _d_Ls = _d_forces = _d_torques = _d_buff_vels = nullptr;
-	_h_vels = _h_Ls = _h_forces = _h_torques = _d_buff_Ls = nullptr;
-	_h_gpu_index = _h_cpu_index = nullptr;
-
-//	_massfile = "default.txt";
-
-	_d_particles_to_mols = _d_mol_sizes = nullptr;
-	_d_molecular_coms = nullptr;
-
-	_h_ext_forces = nullptr;
-	_d_ext_forces = nullptr;
+	_h_ext_forces = NULL;
+	_d_ext_forces = NULL;
 
 	_restart_step_counter = false;
 	_avoid_cpu_calculations = false;
 
-	_timer_sorting = nullptr;
+	_timer_sorting = NULL;
 
 	_curr_step = -1;
 	_barostat_attempts = _barostat_accepted = 0;
 
 	_print_energy = false;
 
-	_obs_output_error_conf = nullptr;
+	_obs_output_error_conf = NULL;
 
 	// on CUDA the timers need to be told to explicitly synchronise on the GPU
 	TimingManager::instance()->enable_sync();
 }
 
 MD_CUDABackend::~MD_CUDABackend() {
-	if(_d_particles_to_mols != nullptr) {
+	if(_d_particles_to_mols != NULL) {
 		CUDA_SAFE_CALL(cudaFree(_d_particles_to_mols));
 	}
 
-	if(_d_mass != nullptr) {
+	if(_d_mass != NULL) {
 	    CUDA_SAFE_CALL(cudaFree(_d_mass));
 	}
 
-	if(_d_vels != nullptr) {
+	if(_d_vels != NULL) {
 		CUDA_SAFE_CALL(cudaFree(_d_vels));
 		CUDA_SAFE_CALL(cudaFree(_d_Ls));
 		CUDA_SAFE_CALL(cudaFree(_d_forces));
 		CUDA_SAFE_CALL(cudaFree(_d_torques));
 	}
 
-	if(_d_molecular_coms != nullptr) {
+	if(_d_molecular_coms != NULL) {
 		CUDA_SAFE_CALL(cudaFree(_d_molecular_coms));
 	}
 
-	if(_sort_every > 0 && _d_buff_vels != nullptr) {
+	if(_sort_every > 0 && _d_buff_vels != NULL) {
 		CUDA_SAFE_CALL(cudaFree(_d_buff_vels));
 		CUDA_SAFE_CALL(cudaFree(_d_buff_Ls));
 		CUDA_SAFE_CALL(cudaFree(_d_buff_particles_to_mols));
 	}
 
-	if(_h_gpu_index != nullptr) {
+	if(_h_gpu_index != NULL) {
 		delete[] _h_gpu_index;
 		delete[] _h_cpu_index;
 	}
 
 	if(_external_forces) {
-		if(_h_ext_forces != nullptr) {
+		if(_h_ext_forces != NULL) {
 			delete[] _h_ext_forces;
 		}
-		if(_d_ext_forces != nullptr) {
+		if(_d_ext_forces != NULL) {
 			CUDA_SAFE_CALL(cudaFree(_d_ext_forces));
 		}
 	}
 
-	if(_massvalues != nullptr){
-	    delete[] _massvalues;
-	}
-
-	if(_h_mass != nullptr){
+	if(_h_mass != NULL){
 	    delete[] _h_mass;
 	}
 
-	if(_h_vels != nullptr) {
+	if(_h_vels != NULL) {
 		delete[] _h_vels;
 		delete[] _h_Ls;
 		delete[] _h_forces;
 		delete[] _h_torques;
 	}
 
-	if(_obs_output_error_conf != nullptr) {
+	if(_obs_output_error_conf != NULL) {
 		delete _obs_output_error_conf;
 	}
 
-//	delete[] _defmasses;
-
-	if(_massvalues != nullptr){
-	    delete[] _massvalues;
+	if(_massvalues != NULL) {
+	    delete []_massvalues;
 	}
-
 }
 
 void MD_CUDABackend::_host_to_gpu() {
@@ -152,6 +139,7 @@ void MD_CUDABackend::_host_to_gpu() {
 	CUDA_SAFE_CALL(cudaMemcpy(_d_particles_to_mols, _h_particles_to_mols.data(), sizeof(int) * N(), cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(_d_vels, _h_vels, _vec_size, cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(_d_Ls, _h_Ls, _vec_size, cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpy(_d_mass, _h_mass, _particles.size() * sizeof(c_number), cudaMemcpyHostToDevice));
 }
 
 void MD_CUDABackend::_gpu_to_host() {
@@ -161,6 +149,7 @@ void MD_CUDABackend::_gpu_to_host() {
 	CUDA_SAFE_CALL(cudaMemcpy(_h_Ls, _d_Ls, _vec_size, cudaMemcpyDeviceToHost));
 	CUDA_SAFE_CALL(cudaMemcpy(_h_forces, _d_forces, _vec_size, cudaMemcpyDeviceToHost));
 	CUDA_SAFE_CALL(cudaMemcpy(_h_torques, _d_torques, _vec_size, cudaMemcpyDeviceToHost));
+    CUDA_SAFE_CALL(cudaMemcpy(_h_mass, _d_mass, _particles.size() * sizeof(c_number), cudaMemcpyDeviceToHost));
 }
 
 void MD_CUDABackend::apply_changes_to_simulation_data() {
@@ -185,7 +174,7 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			throw oxDNAException("Could not treat the type (A, C, G, T or something specific) of particle %d; On CUDA, the maximum \"unique\" identity is 512");
 		}
 
-		_h_mass[i] = _massvalues[p->btype]; // fill mass array
+		_h_mass[i] = _massvalues[p->btype]; // fill _h_mass array
 
 		if(p->index != myindex) {
 			throw oxDNAException("Could not treat the index of particle %d; remember that on CUDA the maximum c_number of particles is 2^21", p->index);
@@ -244,7 +233,6 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			}
 		}
 	}
-    CUDA_SAFE_CALL( cudaMemcpy(_d_mass, _h_mass, N()*sizeof(c_number), cudaMemcpyHostToDevice));
 	_host_to_gpu();
 }
 
@@ -267,6 +255,8 @@ void MD_CUDABackend::apply_simulation_data_changes() {
 		p->pos.z = _h_poss[i].z;
 
 		p->strand_id = _h_particles_to_mols[i];
+		p->mass = _h_mass[i];
+		p->massinverted = 1.f/p->mass;
 
 		// get index and type from the fourth component of the position
 		p->btype = (GpuUtils::float_as_int(_h_poss[i].w)) >> 22;
@@ -554,8 +544,7 @@ void MD_CUDABackend::get_settings(input_file &inp) {
 	}
 
     if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) {
-        OX_LOG(Logger::LOG_INFO, "Using Default Mass File");
-        _massvalues = _defmasses;
+        OX_LOG(Logger::LOG_INFO, "Using Default Masses");
     } else {
         load_massfile(_massfile);
     }
@@ -626,6 +615,8 @@ void MD_CUDABackend::init() {
 	_h_torques = new c_number4[N()];
 
 	_h_mass = new c_number[N()]; //variable masses
+    _massvalues = new c_number[26]();
+    for(int i = 0; i < 26; i++) _massvalues[i] = (c_number) 1.0;
 
 	_obs_output_error_conf->init();
 
@@ -817,7 +808,7 @@ void MD_CUDABackend::init() {
 	}
 
 	// copy all the particle related stuff and the constants to device memory
-	apply_changes_to_simulation_data();
+	apply_changes_to_simulation_data(); // fills _h_mass as well now
 	_init_CUDA_MD_symbols();
 
 	_cuda_thermostat->set_seed(lrand48());
@@ -850,7 +841,7 @@ void MD_CUDABackend::load_massfile(std::string &filename) {
         mass_stream >> masstypes;
         _massvalues = new c_number[masstypes]();
         while (mass_stream >> type >> mass) {
-            _massvalues[type] = mass;
+            _massvalues[type] = (c_number) mass;
         }
     } else
         throw oxDNAException("Could Not Load Mass File, Aborting");

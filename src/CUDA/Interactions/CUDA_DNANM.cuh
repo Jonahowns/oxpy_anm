@@ -28,9 +28,7 @@ __constant__ int _ndna;
 __constant__ int _offset;
 
 //**********
-//Exact copy from DNA.cuh
-// ******************
-// EXACT COPY FROM DNA.cuh
+//Exact copy from DNA.cuh except all function names changed and some commented out
 /* System constants */
 __constant__ int MD_N[1];
 __constant__ int MD_n_forces[1];
@@ -1173,7 +1171,7 @@ __device__ void dnanm_particle_particle_interaction(c_number4 ppos, c_number4 a1
 
 // ANM/ANMT code
 template< bool qisN3>
-__forceinline__ __device__ void _ang_pot(c_number4 &dF, c_number4 &dT, const c_number4 &a1, const c_number4 &a3, const c_number4 &b1, const c_number4 &b3, const c_number4 &r, const c_number4 &ang_params, c_number (&kbkt)[2]) {
+__forceinline__ __device__ void ang_pot(c_number4 &dF, c_number4 &dT, const c_number4 &a1, const c_number4 &a3, const c_number4 &b1, const c_number4 &b3, const c_number4 &r, const c_number4 &ang_params, c_number (&kbkt)[2]) {
     dF.x = dF.y = dF.z = dF.w = (c_number) 0.;
     dT.x = dT.y = dT.z = dT.w = (c_number) 0.;
     c_number4 rij = make_c_number4(r.x/_module(r), r.y/_module(r), r.z/_module(r), 0.);
@@ -1236,7 +1234,7 @@ __forceinline__ __device__ void _ang_pot(c_number4 &dF, c_number4 &dT, const c_n
 
 }
 
-__forceinline__ __device__ void _excluded_volume_quart(const c_number4 &r, c_number4 &F, c_number sigma, c_number rstar, c_number b, c_number rc) {
+__forceinline__ __device__ void excluded_volume_quart(const c_number4 &r, c_number4 &F, c_number sigma, c_number rstar, c_number b, c_number rc) {
     c_number rsqr = CUDA_DOT(r, r);
 
     F.x = F.y = F.z = F.w = (c_number) 0.f;
@@ -1261,7 +1259,7 @@ __forceinline__ __device__ void _excluded_volume_quart(const c_number4 &r, c_num
     }
 }
 
-__forceinline__ __device__ void _excluded_volume_quart_ang(const c_number4 &r, c_number4 &F, c_number4 &T, c_number sigma, c_number rstar, c_number b, c_number rc) {
+__forceinline__ __device__ void excluded_volume_quart_ang(const c_number4 &r, c_number4 &F, c_number4 &T, c_number sigma, c_number rstar, c_number b, c_number rc) {
     c_number rsqr = CUDA_DOT(r, r);
 
     F.x = F.y = F.z = F.w = (c_number) 0.f;
@@ -1285,7 +1283,7 @@ __forceinline__ __device__ void _excluded_volume_quart_ang(const c_number4 &r, c
         }
     }
 
-    T += _cross(r, F); //add torque
+    T += _cross(r/2, F); //add torque
 }
 
 __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *orientations, c_number4 *forces, c_number4 *torques, edge_bond *edge_list, int n_edges, LR_bonds *bonds, bool grooving, bool use_debye_huckel, bool use_oxDNA2_coaxial_stacking, CUDABox *box) {
@@ -1309,18 +1307,17 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
     c_number4 b1, b2, b3;
     get_vectors_from_quat(orientations[b.to], b1, b2, b3);
 
-    c_number4 r = box->minimum_image(qpos, ppos);
+    c_number4 r = box->minimum_image(ppos, qpos);
     c_number sqr_distance = (r.x * r.x + r.y * r.y + r.z * r.z);
     if(sqr_distance > MD_dna_sqr_rcut) return;
+
+    int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
+    int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
 
     if (pbtype > 4 && qbtype > 4) {
         if(sqr_distance > MD_pro_sqr_rcut) return;
         //Protein-Protein Excluded Volume
-        _excluded_volume_quart_ang(r, dF, dT, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
-
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
-
+        excluded_volume_quart_ang(r, dF, dT, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
         //Add force and torque to p index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[from_index]), dF);
@@ -1351,15 +1348,12 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         c_number4 rback = r - ppos_back;
         c_number4 rbase = r - ppos_base;
 
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to;
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from;
-
         c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
-        _excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
+        excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
         dT += _cross(ppos_back, Ftmp);
         dF += Ftmp;
 
-        _excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
+        excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
         dT += _cross(ppos_base, Ftmp);
         dF += Ftmp;
 
@@ -1390,20 +1384,17 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         c_number4 qpos_base = POS_BASE * b1;
         c_number4 qpos_stack = POS_STACK * b1;
 
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to;
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from;
-
         //vector r is reversed from the above case
 
         c_number4 rback = r - qpos_back;
         c_number4 rbase = r - qpos_base;
 
         c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
-        _excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
+        excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
         dT += _cross(qpos_back, Ftmp);
         dF += Ftmp;
 
-        _excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
+        excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
         dT += _cross(qpos_base, Ftmp);
         dF += Ftmp;
 
@@ -1430,12 +1421,11 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
     } else if(pbtype < 4 && qbtype < 4){ // dna- dna nonbonded
         LR_bonds pbonds = bonds[b.from];
         LR_bonds qbonds = bonds[b.to];
-       dnanm_particle_particle_interaction(ppos, a1, a2, a3, qpos, b1, b2, b3, dF, dT, grooving,
+        dnanm_particle_particle_interaction(ppos, a1, a2, a3, qpos, b1, b2, b3, dF, dT, grooving,
                                                         use_debye_huckel, use_oxDNA2_coaxial_stacking, pbonds, qbonds,
                                                         b.from, b.to, box);
 
 
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from;
         //int from_index = MD_N[0]*(b.n_from % MD_n_forces[0]) + b.from;
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[from_index]), dF);
@@ -1453,7 +1443,6 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         dF.y = -dF.y;
         dF.z = -dF.z;
 
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to;
         //int to_index = MD_N[0]*(b.n_to % MD_n_forces[0]) + b.to;
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[to_index]), dF);
@@ -1483,17 +1472,16 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
     c_number4 b1, b2, b3;
     get_vectors_from_quat(orientations[b.to], b1, b2, b3);
 
-    c_number4 r = box->minimum_image(qpos, ppos);
+    c_number4 r = box->minimum_image(ppos, qpos);
     c_number sqr_distance = (r.x * r.x + r.y * r.y + r.z * r.z);
-    if(sqr_distance > MD_dna_sqr_rcut) return;
+
+    int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
+    int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
 
     if (pbtype > 4 && qbtype > 4) {
         if(sqr_distance > MD_pro_sqr_rcut) return;
         //Protein-Protein Excluded Volume
-        _excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
-
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
+        excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
 
         //Add force to p index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
@@ -1517,16 +1505,13 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         c_number4 rback = r - ppos_back;
         c_number4 rbase = r - ppos_base;
 
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; // p
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; // q
-
         c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
-        _excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
-        dT += _cross(ppos_back, Ftmp*-1);
+        excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
+        dT += _cross(ppos_back, Ftmp);
         dF += Ftmp;
 
-        _excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
-        dT += _cross(ppos_base, Ftmp*-1);
+        excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
+        dT += _cross(ppos_base, Ftmp);
         dF += Ftmp;
 
         // Add force to q index, no torque
@@ -1550,20 +1535,17 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         c_number4 qpos_base = POS_BASE * b1;
         c_number4 qpos_stack = POS_STACK * b1;
 
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; // p
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //q
-
         //vector r is reversed from the above case
 
         c_number4 rback = r - qpos_back;
         c_number4 rbase = r - qpos_base;
 
         c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
-        _excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
+        excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
         dT += _cross(qpos_back, Ftmp);
         dF += Ftmp;
 
-        _excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
+        excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
         dT += _cross(qpos_base, Ftmp);
         dF += Ftmp;
 
@@ -1584,12 +1566,10 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
     } else if(pbtype < 4 && qbtype < 4){ // dna- dna nonbonded
         LR_bonds pbonds = bonds[b.from];
         LR_bonds qbonds = bonds[b.to];
-       dnanm_particle_particle_interaction(ppos, a1, a2, a3, qpos, b1, b2, b3, dF, dT, grooving,
+        dnanm_particle_particle_interaction(ppos, a1, a2, a3, qpos, b1, b2, b3, dF, dT, grooving,
                                        use_debye_huckel, use_oxDNA2_coaxial_stacking, pbonds, qbonds,
                                        b.from, b.to, box);
 
-
-        int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from;
         //int from_index = MD_N[0]*(b.n_from % MD_n_forces[0]) + b.from;
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[from_index]), dF);
@@ -1607,7 +1587,6 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         dF.y = -dF.y;
         dF.z = -dF.z;
 
-        int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to;
         //int to_index = MD_N[0]*(b.n_to % MD_n_forces[0]) + b.to;
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[to_index]), dF);
@@ -1620,22 +1599,22 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
 __global__ void dnanm_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations,  c_number4 *forces, c_number4 *torques, LR_bonds *bonds, bool grooving, bool use_oxDNA2_FENE, bool use_mbf, c_number mbf_xmax, c_number mbf_finf, CUDABox *box, c_number *_d_aff_eqdist, c_number *_d_aff_gamma, int *_d_affected_indx, int *_d_affected) {
     if(IND >= MD_N[0]) return;
 
-    c_number4 F0, T0;
-
-    F0.x = forces[IND].x;
-    F0.y = forces[IND].y;
-    F0.z = forces[IND].z;
-    F0.w = forces[IND].w;
-    T0.x = torques[IND].x;
-    T0.y = torques[IND].y;
-    T0.z = torques[IND].z;
-    T0.w = torques[IND].w;
+//    c_number4 F0, T0;
+//
+//    F0.x = forces[IND].x;
+//    F0.y = forces[IND].y;
+//    F0.z = forces[IND].z;
+//    F0.w = forces[IND].w;
+//    T0.x = torques[IND].x;
+//    T0.y = torques[IND].y;
+//    T0.z = torques[IND].z;
+//    T0.w = torques[IND].w;
 
     c_number4 dF = make_c_number4(0, 0, 0, 0);
     c_number4 dT = make_c_number4(0, 0, 0, 0);
     c_number4 ppos = poss[IND];
     // get btype of p
-    int pbtype = get_particle_btype (ppos);
+    int pbtype = get_particle_btype(ppos);
 
     if (pbtype < 4){
         //Nucleotide
@@ -1664,16 +1643,17 @@ __global__ void dnanm_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
 
         }
 
-        forces[IND] = (dF + F0);
-        torques[IND] = (dT + T0);
-
+//        forces[IND] = (dF + F0);
+//        torques[IND] = (dT + T0);
+        LR_atomicAdd(&(forces[IND]), dF);
+        LR_atomicAdd(&(torques[IND]), dT);
         torques[IND] = _vectors_transpose_c_number4_product(a1, a2, a3, torques[IND]);
     } else {
         //Protein Particles
         int pindex = IND - _offset;
 
-        c_number4 p1, p2, p3;
-        get_vectors_from_quat(orientations[IND], p1, p2, p3);
+//        c_number4 p1, p2, p3;
+//        get_vectors_from_quat(orientations[IND], p1, p2, p3);
         //printf("p %d p1 %.4f %.4f %.4f p2 % .4f %.4f %.4f p3 %.4f %.4f %.4f\n", IND, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
 
         c_number4 ftotal = make_c_number4(0, 0, 0, 0);
@@ -1697,7 +1677,7 @@ __global__ void dnanm_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
             c_number fmod = (-1.0f * gamma) * (d - eqdist) / d;
 
             dF = fmod * r;
-            dF.w = 0.5 * (0.5f * gamma * SQR(d - eqdist));
+            dF.w = 0.5f * (0.5f * gamma * SQR(d - eqdist)); //energy is 1/2 since each interaction is computed twice
 
             ftotal -= dF;
         }
@@ -1711,22 +1691,22 @@ __global__ void dnanm_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
 __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orientations,  c_number4 *forces, c_number4 *torques, LR_bonds *bonds, bool grooving, bool use_oxDNA2_FENE, bool use_mbf, c_number mbf_xmax, c_number mbf_finf, CUDABox *box, c_number *_d_aff_eqdist, c_number *_d_aff_gamma, c_number *_d_ang_params, c_number *_d_ang_kbkt, int *_d_affected_indx, int *_d_affected) {
     if(IND >= MD_N[0]) return;
 
-    c_number4 F0, T0;
-
-    F0.x = forces[IND].x;
-    F0.y = forces[IND].y;
-    F0.z = forces[IND].z;
-    F0.w = forces[IND].w;
-    T0.x = torques[IND].x;
-    T0.y = torques[IND].y;
-    T0.z = torques[IND].z;
-    T0.w = torques[IND].w;
+//    c_number4 F0, T0;
+//
+//    F0.x = forces[IND].x;
+//    F0.y = forces[IND].y;
+//    F0.z = forces[IND].z;
+//    F0.w = forces[IND].w;
+//    T0.x = torques[IND].x;
+//    T0.y = torques[IND].y;
+//    T0.z = torques[IND].z;
+//    T0.w = torques[IND].w;
 
     c_number4 dF = make_c_number4(0, 0, 0, 0);
     c_number4 dT = make_c_number4(0, 0, 0, 0);
     c_number4 ppos = poss[IND];
     // get btype of p
-    int pbtype = get_particle_btype (ppos);
+    int pbtype = get_particle_btype(ppos);
 
     if (pbtype < 4){
         //Nucleotide
@@ -1756,9 +1736,8 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
 
         }
 
-        forces[IND] = (dF + F0);
-        torques[IND] = (dT + T0);
-
+        LR_atomicAdd(&(forces[IND]), dF);
+        LR_atomicAdd(&(torques[IND]), dT);
         torques[IND] = _vectors_transpose_c_number4_product(a1, a2, a3, torques[IND]);
     } else {
         //Protein Particles
@@ -1800,16 +1779,16 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
             c_number4 a1, a2, a3;
             get_vectors_from_quat(orientations[IND-1], a1, a2, a3);
             //printf("p %d q %d a1 %.4f %.4f %.4f b1 %.4f %.4f %.4f\n", IND-1, IND, a1.x, a1.y, a1.z, b1.x, b1.y, b1.z);
-            _ang_pot<true>(dF, dT, a1, a3, b1, b3, r, angle_o, n3kbkt); // q is n3
+            ang_pot<true>(dF, dT, a1, a3, b1, b3, r, angle_o, n3kbkt); // q is n3
 
             //Add contribution from Angular Potential
-            //Energy is halved in each _ang_pot call
+            //Energy is halved in each ang_pot call
             //Torque is stored in dT
             ftotal += dF;
             ttotal += dT;
 
             //Excluded Volume Bonded n3 Neighbor (Since bonded neighs not included in edge list)
-            _excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
+            excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
             ftotal -= dF;
         }
 
@@ -1826,16 +1805,16 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
             c_number4 b1, b2, b3;
             get_vectors_from_quat(orientations[IND+1], b1, b2, b3);
             //printf("p %d q %d a1 %.4f %.4f %.4f b1 %.4f %.4f %.4f\n", IND, IND+1, a1.x, a1.y, a1.z, b1.x, b1.y, b1.z);
-            _ang_pot<false>(dF, dT, a1, a3, b1, b3, r, angle_o, n5kbkt);
+            ang_pot<false>(dF, dT, a1, a3, b1, b3, r, angle_o, n5kbkt);
 
             //Add contribution from Angular Potential
-            //Energy is halved in each _ang_pot call
+            //Energy is halved in each ang_pot call
             //Torque is stored in dT
             ftotal += dF;
             ttotal += dT;
 
             //Excluded Volume Bonded Neighbor n5 (Since bonded neighs not included in edge list)
-            _excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
+            excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
             ftotal += dF;
         }
 
