@@ -241,11 +241,11 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             std::set<int> myneighs;
             if (nside >= 0) {
                 myneighs.insert(nside);
-                p->n3 = particles[nside];
+                if(_angular) p->n3 = particles[nside];
             }
             if (cside >= 0) {
                 myneighs.insert(cside);
-                p->n5 = particles[cside];
+                if(_angular) p->n5 = particles[cside];
             }
             while (ss.good()) {
                 ss >> x;
@@ -365,7 +365,7 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         energy += _stacking(p,q,compute_r,update_forces);
         return energy;
     } else if (p->btype > 4 && q->btype > 4){
-        if(_angular){;
+        if(_angular){
             if (!p->is_bonded(q)) return 0.f;
             number energy = _protein_spring(p, q, compute_r, update_forces);
             energy += _protein_exc_volume(p, q, compute_r, update_forces);
@@ -375,6 +375,9 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
             if (!p->is_bonded(q)) return 0.f;
             number energy = _protein_spring(p, q, compute_r, update_forces);
             energy += _protein_exc_volume(p, q, compute_r, update_forces);
+//            if(p->index<10){
+//                printf("bonded p %d q %d E %f\n", p->index, q->index, energy);
+//            }
             return energy;
         }
     } else
@@ -409,8 +412,12 @@ number DNANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
     if (p->btype > 4 && q->btype > 4) {
         if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
         number energy = _protein_exc_volume(p, q, compute_r, update_forces);
+//        if(p->index<10){
+//            printf("nonbonded p %d q %d E %f\n", p->index, q->index, energy);
+//        }
         return energy;
     }
+
 
     return 0.f;
 }
@@ -450,29 +457,28 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
         energy = _protein_dna_repulsive_lj(r_to_back, force, update_forces, _pro_backbone_sigma, _pro_backbone_b, _pro_backbone_rstar,_pro_backbone_rcut,_pro_backbone_stiffness);
         //printf("back-pro %d %d %f\n",p->index,q->index,energy);
         if (update_forces) {
-            torquenuc = nuc->int_centers[DNANucleotide::BACK].cross(force);
+            torquenuc = nuc->int_centers[DNANucleotide::BACK].cross(-force);
+            nuc->torque += nuc->orientationT * torquenuc;
             nuc->force -= force;
             protein->force += force;
             if(_angular){
                 r_to_back.normalize();
-                protein->torque += (r_to_back*_pro_sigma/2).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+                protein->torque += p->orientationT*(r_to_back*_pro_sigma/2).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
             }
-            nuc->torque += nuc->orientationT * torquenuc;
         }
     }
 
     if(r_to_base.norm() < _pro_base_sqr_rcut){
         energy += _protein_dna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
         if(update_forces) {
-            torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(force);
+            torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(-force);
             nuc->torque += nuc->orientationT * torquenuc;
-
+            nuc->force -= force;
+            protein->force += force;
             if(_angular){
                 r_to_base.normalize();
                 protein->torque += p->orientationT*(r_to_base*_pro_sigma/2).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
             }
-            nuc->force -= force;
-            protein->force += force;
         }
     }
 
@@ -574,7 +580,7 @@ number DNANMInteraction::_protein_exc_volume(BaseParticle *p, BaseParticle *q, b
         q->force += force;
         if(_angular){
             p->torque += p->orientationT*(_computed_r/2).cross(-force);
-            q->torque += p->orientationT*(-_computed_r/2).cross(force);
+            q->torque += q->orientationT*(-_computed_r/2).cross(force);
         }
     }
 

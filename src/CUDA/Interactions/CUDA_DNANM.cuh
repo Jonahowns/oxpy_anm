@@ -1175,7 +1175,7 @@ __forceinline__ __device__ void ang_pot(c_number4 &dF, c_number4 &dT, const c_nu
     dF.x = dF.y = dF.z = dF.w = (c_number) 0.;
     dT.x = dT.y = dT.z = dT.w = (c_number) 0.;
     c_number4 rij = make_c_number4(r.x/_module(r), r.y/_module(r), r.z/_module(r), 0.);
-    c_number4 rji = (double) -1. * rij;
+    c_number4 rji = -1.f * rij;
 
     c_number o1 = (CUDA_DOT(rij, a1)) - ang_params.x;
     c_number o2 = (CUDA_DOT(rji, b1)) - ang_params.y;
@@ -1192,7 +1192,7 @@ __forceinline__ __device__ void ang_pot(c_number4 &dF, c_number4 &dT, const c_nu
 
         dF += F;
 
-        dF.w = 0.5*energy;
+        dF.w = 0.5f*energy;
 
         c_number4 dTb = (_cross(rji, b1) * o2 *kb) + ((_cross(a1, b1) * o3 * kt) +
                                                                      (_cross(a3, b3) * o4 * kt));
@@ -1214,7 +1214,7 @@ __forceinline__ __device__ void ang_pot(c_number4 &dF, c_number4 &dT, const c_nu
 
         dF -= F;
 
-        dF.w = 0.5*energy;
+        dF.w = 0.5f*energy;
 
         c_number4 dTa = (_cross(rij, a1) * o1 *kb) - ((_cross(a1, b1) * o3 * kt) +
                                                       (_cross(a3, b3) * o4 * kt));
@@ -1263,6 +1263,7 @@ __forceinline__ __device__ void excluded_volume_quart_ang(const c_number4 &r, c_
     c_number rsqr = CUDA_DOT(r, r);
 
     F.x = F.y = F.z = F.w = (c_number) 0.f;
+    T.x = T.y = T.z = T.w = (c_number) 0.f;
     if(rsqr < SQR(rc)) {
         if(rsqr > SQR(rstar)) {
             c_number rmod = sqrt(rsqr);
@@ -1281,9 +1282,11 @@ __forceinline__ __device__ void excluded_volume_quart_ang(const c_number4 &r, c_
             F.z = r.z * fmod;
             F.w = 4.f * EXCL_EPS * (SQR(lj_part) - lj_part);
         }
+
+        T += _cross(_normalize(r)*(MD_pro_sigma/2), F); //add torque
     }
 
-    T += _cross(r/2, F); //add torque
+
 }
 
 __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *orientations, c_number4 *forces, c_number4 *torques, edge_bond *edge_list, int n_edges, LR_bonds *bonds, bool grooving, bool use_debye_huckel, bool use_oxDNA2_coaxial_stacking, CUDABox *box) {
@@ -1291,6 +1294,7 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
 
     c_number4 dF = make_c_number4(0, 0, 0, 0);
     c_number4 dT = make_c_number4(0, 0, 0, 0);
+    c_number4 proT = make_c_number4(0, 0, 0, 0);
 
     edge_bond b = edge_list[IND];
 
@@ -1318,6 +1322,7 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         if(sqr_distance > MD_pro_sqr_rcut) return;
         //Protein-Protein Excluded Volume
         excluded_volume_quart_ang(r, dF, dT, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
+
         //Add force and torque to p index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[from_index]), dF);
@@ -1332,7 +1337,7 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         dT.y = -dT.y;
         dT.z = -dT.z;
 
-        //Add force and torque to q index
+        //Add (negative) force and torque to p index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[to_index]), dF);
         if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
@@ -1350,11 +1355,13 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
 
         c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
         excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
-        dT += _cross(ppos_back, Ftmp);
+        dT += _cross(ppos_back, Ftmp); // cross of point of contact on protein sphere and dna backbone
+        proT = _cross(_normalize(rback)*(MD_pro_sigma/2), -Ftmp);
         dF += Ftmp;
 
         excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
         dT += _cross(ppos_base, Ftmp);
+        proT += _cross(_normalize(rbase)*(MD_pro_sigma/2), -Ftmp); // cross of point of contact on protein sphere and dna base
         dF += Ftmp;
 
         // Add force and torque to p index
@@ -1367,15 +1374,11 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         dF.y = -dF.y;
         dF.z = -dF.z;
 
-        dT.x = -dT.x;
-        dT.y = -dT.y;
-        dT.z = -dT.z;
-
         //Add force to q index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[to_index]), dF);
         if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
-            LR_atomicAddXYZ(&(torques[to_index]), dT);
+            LR_atomicAddXYZ(&(torques[to_index]), proT);
 
     } else if(pbtype > 4 && qbtype < 4) {
         c_number4 qpos_back;
@@ -1385,17 +1388,18 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         c_number4 qpos_stack = POS_STACK * b1;
 
         //vector r is reversed from the above case
-
-        c_number4 rback = r - qpos_back;
-        c_number4 rbase = r - qpos_base;
+        c_number4 rback = -1*(r - qpos_back);
+        c_number4 rbase = -1*(r - qpos_base);
 
         c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
         excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
         dT += _cross(qpos_back, Ftmp);
+        proT = _cross(_normalize(rback)*(MD_pro_sigma/2), -Ftmp); // cross of point of contact b/t protein sphere and dna backbone and excluded volume force
         dF += Ftmp;
 
         excluded_volume_quart(rbase, Ftmp, MD_pro_base_sigma, MD_pro_base_rstar, MD_pro_base_b, MD_pro_base_rc);
         dT += _cross(qpos_base, Ftmp);
+        proT += _cross(_normalize(rbase)*(MD_pro_sigma/2), -Ftmp); // cross of point of contact b/t protein sphere and dna base and excluded volume force
         dF += Ftmp;
 
         // Add Force and torque to q index
@@ -1408,15 +1412,11 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         dF.y = -dF.y;
         dF.z = -dF.z;
 
-        dT.x = -dT.x;
-        dT.y = -dT.y;
-        dT.z = -dT.z;
-
-        //add forces to p index
+        //add forces and torque to p index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[from_index]), dF);
         if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
-            LR_atomicAddXYZ(&(torques[from_index]), dT);
+            LR_atomicAddXYZ(&(torques[from_index]), proT);
 
     } else if(pbtype < 4 && qbtype < 4){ // dna- dna nonbonded
         LR_bonds pbonds = bonds[b.from];
@@ -1514,19 +1514,19 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         dT += _cross(ppos_base, Ftmp);
         dF += Ftmp;
 
-        // Add force to q index, no torque
+        //from -> p index to -> q index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[from_index]), dF);
+        if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
+            LR_atomicAddXYZ(&(torques[from_index]), dT);
 
         dF.x = -dF.x;
         dF.y = -dF.y;
         dF.z = -dF.z;
 
-        //Add force and torque to p index
+        //Add force to p index
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[to_index]), dF);
-        if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
-            LR_atomicAddXYZ(&(torques[to_index]), dT);
 
     } else if(pbtype > 4 && qbtype < 4) {
         c_number4 qpos_back;
@@ -1536,9 +1536,8 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         c_number4 qpos_stack = POS_STACK * b1;
 
         //vector r is reversed from the above case
-
-        c_number4 rback = r - qpos_back;
-        c_number4 rbase = r - qpos_base;
+        c_number4 rback = -1*(r - qpos_back); // flipped to have it pointing from nucleotide backbone to protein
+        c_number4 rbase = -1*(r - qpos_base); // flipped to have it pointing from nucleotide base to protein
 
         c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
         excluded_volume_quart(rback, Ftmp, MD_pro_backbone_sigma, MD_pro_backbone_rstar, MD_pro_backbone_b, MD_pro_backbone_rc);
@@ -1615,10 +1614,10 @@ __global__ void dnanm_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
     c_number4 ppos = poss[IND];
     // get btype of p
     int pbtype = get_particle_btype(ppos);
+    LR_bonds bs = bonds[IND];
 
     if (pbtype < 4){
         //Nucleotide
-        LR_bonds bs = bonds[IND];
         // particle axes according to Allen's paper
 
         c_number4 a1, a2, a3;
@@ -1650,25 +1649,36 @@ __global__ void dnanm_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
         torques[IND] = _vectors_transpose_c_number4_product(a1, a2, a3, torques[IND]);
     } else {
         //Protein Particles
-        int pindex = IND - _offset;
-
-//        c_number4 p1, p2, p3;
-//        get_vectors_from_quat(orientations[IND], p1, p2, p3);
-        //printf("p %d p1 %.4f %.4f %.4f p2 % .4f %.4f %.4f p3 %.4f %.4f %.4f\n", IND, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
-
         c_number4 ftotal = make_c_number4(0, 0, 0, 0);
         c_number4 ttotal = make_c_number4(0, 0, 0, 0);
 
+        // not needed (edge list and nonbonded interaction will do this automatically) bc removed n3 and n5 of particles in topology reader of dnanmInteraction.cpp
+//        //bonded excluded volume
+//        if(bs.n3 != P_INVALID) {
+//            c_number4 &qpos = poss[bs.n3];
+//            c_number4 r = box->minimum_image(qpos, ppos);
+//            excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
+//            ftotal -= dF;
+//        }
+//        if(bs.n5 != P_INVALID) {
+//            c_number4 &qpos = poss[bs.n5];
+//            c_number4 r = box->minimum_image(ppos, qpos);
+//            excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
+//            ftotal += dF;
+//        }
+
         //Spring
         //bounds for spring loop determined per particle
-        int &lb = _d_affected_indx[pindex];
-        int &ub = _d_affected_indx[pindex+1];
+        int &lb = _d_affected_indx[IND-_offset];
+        int &ub = _d_affected_indx[IND-_offset+1];
         //printf("IND %d lb %d ub %d\n", IND, lb, ub);
 
         for(int i = lb; i < ub; i++) {
             int j = _d_affected[i];
+
             c_number4 &qpos = poss[j + _offset];
             c_number4 r = box->minimum_image(ppos, qpos);
+
             c_number d = _module(r);
 
             c_number &gamma = _d_aff_gamma[i];
@@ -1707,12 +1717,11 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
     c_number4 ppos = poss[IND];
     // get btype of p
     int pbtype = get_particle_btype(ppos);
+    LR_bonds bs = bonds[IND];
 
     if (pbtype < 4){
         //Nucleotide
-        LR_bonds bs = bonds[IND];
         // particle axes according to Allen's paper
-
         c_number4 a1, a2, a3;
         get_vectors_from_quat(orientations[IND], a1, a2, a3);
 
@@ -1741,8 +1750,6 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
         torques[IND] = _vectors_transpose_c_number4_product(a1, a2, a3, torques[IND]);
     } else {
         //Protein Particles
-        LR_bonds bs = bonds[IND];
-
         int pindex = IND - _offset;
 
         int n3, n5 = -1;
@@ -1768,7 +1775,7 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
 
         //Previous neighbor
         if (n3 >= 0){
-            c_number4 n3pos = poss[IND-1];
+            c_number4 n3pos = poss[bs.n3];
             c_number4 r = box->minimum_image(n3pos, ppos);
             c_number4 angle_o = make_c_number4(_d_ang_params[n3*4], _d_ang_params[n3*4+1], _d_ang_params[n3*4+2], _d_ang_params[n3*4+3]);
 //            printf("p %d q %d Angle Params a0 %.4f b0 %.4f c0 %.4f d0 %.4f\n", pindex, IND-1, angle_o.x, angle_o.y, angle_o.z, angle_o.w);
@@ -1777,7 +1784,7 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
             c_number4 &b3 = p3;
 
             c_number4 a1, a2, a3;
-            get_vectors_from_quat(orientations[IND-1], a1, a2, a3);
+            get_vectors_from_quat(orientations[bs.n3], a1, a2, a3);
             //printf("p %d q %d a1 %.4f %.4f %.4f b1 %.4f %.4f %.4f\n", IND-1, IND, a1.x, a1.y, a1.z, b1.x, b1.y, b1.z);
             ang_pot<true>(dF, dT, a1, a3, b1, b3, r, angle_o, n3kbkt); // q is n3
 
@@ -1788,14 +1795,15 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
             ttotal += dT;
 
             //Excluded Volume Bonded n3 Neighbor (Since bonded neighs not included in edge list)
-            excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
+            excluded_volume_quart_ang(r, dF, dT, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
             ftotal -= dF;
+            ttotal += dT;
         }
 
 //        if(IND == 2) printf("CUDA q2 Angular F %.4f %.4f %.4f T %.4f %.4f %.4f %.4f\n", dF.x, dF.y, dF.z, dT.x, dT.y, dT.z, dT.w);
         //Next neighbor
         if (n5 > 0) {
-            c_number4 n5pos = poss[IND+1];
+            c_number4 n5pos = poss[bs.n5];
             c_number4 r = box->minimum_image(ppos, n5pos);
             c_number4 angle_o = make_c_number4(_d_ang_params[pindex*4], _d_ang_params[pindex*4+1], _d_ang_params[pindex*4+2], _d_ang_params[pindex*4+3]);
             // In this case our particle is particle i of the pairwise interaction
@@ -1803,7 +1811,7 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
             c_number4 &a3 = p3;
 
             c_number4 b1, b2, b3;
-            get_vectors_from_quat(orientations[IND+1], b1, b2, b3);
+            get_vectors_from_quat(orientations[bs.n5], b1, b2, b3);
             //printf("p %d q %d a1 %.4f %.4f %.4f b1 %.4f %.4f %.4f\n", IND, IND+1, a1.x, a1.y, a1.z, b1.x, b1.y, b1.z);
             ang_pot<false>(dF, dT, a1, a3, b1, b3, r, angle_o, n5kbkt);
 
@@ -1814,8 +1822,9 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
             ttotal += dT;
 
             //Excluded Volume Bonded Neighbor n5 (Since bonded neighs not included in edge list)
-            excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
+            excluded_volume_quart_ang(r, dF, dT, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
             ftotal += dF;
+            ttotal += dT;
         }
 
         //Debugging
@@ -1839,7 +1848,7 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
             c_number fmod = (-1.0f * gamma) * (d - eqdist) / d;
 
             dF = fmod * r;
-            dF.w = 0.5 * (0.5f * gamma * SQR(d - eqdist));
+            dF.w = 0.5f * (0.5f * gamma * SQR(d - eqdist));
 
             ftotal -= dF;
         }

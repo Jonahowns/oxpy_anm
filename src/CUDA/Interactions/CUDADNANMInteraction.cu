@@ -129,7 +129,8 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
         }
 
         char potswitch = 'x';
-        c_number potential = 0.f, dist = 0.f;
+        c_number potential = 0.f;
+        c_number dist = 0.f;
         //initializing array members
         for(int i = 0; i< (this->npro*this->npro); i++){
             _spring_eqdist[i] = dist;
@@ -159,9 +160,6 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
         int key1, key2 = 0;
         c_number a0, b0, c0, d0;
         std::string carbons;
-        std::fstream parameters;
-        parameters.open(this->_parameterfile, std::ios::in);
-        getline (parameters,carbons);
 
         //total connections
         int spring_connection_num = 0;
@@ -170,6 +168,9 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
         _affected_len = new int[this->npro]();
         for(int i = 0; i < this->npro; i++) _affected_len[i] = 0;
 
+        std::fstream parameters;
+        parameters.open(this->_parameterfile, std::ios::in);
+        getline (parameters,carbons);
         //Read Parameter File
         if (parameters.is_open())
         {
@@ -308,7 +309,7 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
     } else OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
 
     // Copied from CUDADNAINTERACTION
-    this->DNANMInteraction::init();
+//    this->DNANMInteraction::init();
 //    DNAInteraction::init();
 
     float f_copy = this->_hb_multiplier;
