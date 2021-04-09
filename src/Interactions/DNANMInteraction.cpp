@@ -44,7 +44,7 @@ DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress(
 
     _parameter_kbkt = false;
 
-    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f},
+    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everythin
               {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
               {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
               {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
@@ -147,9 +147,7 @@ void DNANMInteraction::get_settings(input_file &inp){
             if (spring_connection_num == 1 && N > 2 && !_parameter_kbkt)
                 throw oxDNAException(
                         "Invalid Parameter File Format, global kb and kt values have been set in Inputfile");
-        }
-//        } else if (!_angular && spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
-
+        } else if (spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
     } else {
         OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
     }
@@ -358,13 +356,13 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         if (q != P_VIRTUAL && p != P_VIRTUAL)
             _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    if (p->btype < 4 && q->btype < 4){
+    if (p->btype < 4 && q->btype < 4){ // dna-dna
         if(!this->_check_bonded_neighbour(&p, &q, compute_r)) return (number) 0;
         number energy = _backbone(p,q,compute_r,update_forces);
         energy += _bonded_excluded_volume(p,q,compute_r,update_forces);
         energy += _stacking(p,q,compute_r,update_forces);
         return energy;
-    } else if (p->btype > 4 && q->btype > 4){
+    } else if (p->btype > 4 && q->btype > 4){ // protein-protein
         if(_angular){
             if (!p->is_bonded(q)) return 0.f;
             number energy = _protein_spring(p, q, compute_r, update_forces);
@@ -375,16 +373,12 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
             if (!p->is_bonded(q)) return 0.f;
             number energy = _protein_spring(p, q, compute_r, update_forces);
             energy += _protein_exc_volume(p, q, compute_r, update_forces);
-//            if(p->index<10){
-//                printf("bonded p %d q %d E %f\n", p->index, q->index, energy);
-//            }
             return energy;
         }
     } else
         return 0.f;
 
     // Expect Topology to not contain Bonds b/t protein & DNA
-    //if ((p->btype >= 0 && q->btype <0) ||(p->btype <0 && q->btype >=0)) return 0.f;
 }
 
 
@@ -401,23 +395,15 @@ number DNANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
         energy += _coaxial_stacking(p, q, compute_r, update_forces);
         energy += _debye_huckel(p, q, compute_r, update_forces);
         return energy;
-    }
-
-    if ((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) {
+    } else if (p->btype > 4 && q->btype > 4) { // protein-protein
+        if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
+        number energy = _protein_exc_volume(p, q, compute_r, update_forces);
+        return energy;
+    }else if((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) { //protein-dna
         if (rnorm >= _pro_dna_sqr_rcut) return (number) 0.f;
         number energy = _protein_dna_exc_volume(p, q, compute_r, update_forces);
         return energy;
     }
-
-    if (p->btype > 4 && q->btype > 4) {
-        if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
-        number energy = _protein_exc_volume(p, q, compute_r, update_forces);
-//        if(p->index<10){
-//            printf("nonbonded p %d q %d E %f\n", p->index, q->index, energy);
-//        }
-        return energy;
-    }
-
 
     return 0.f;
 }
@@ -463,7 +449,7 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
             protein->force += force;
             if(_angular){
                 r_to_back.normalize();
-                protein->torque += p->orientationT*(r_to_back*_pro_sigma/2).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+                protein->torque += p->orientationT*(r_to_back*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
             }
         }
     }
@@ -477,11 +463,10 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
             protein->force += force;
             if(_angular){
                 r_to_base.normalize();
-                protein->torque += p->orientationT*(r_to_base*_pro_sigma/2).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+                protein->torque += p->orientationT*(r_to_base*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
             }
         }
     }
-
 
     return energy;
 }
@@ -540,10 +525,7 @@ void DNANMInteraction::init() {
     _pro_dna_sqr_rcut = 3.0625f; //placeholder test value 1.75^2
 }
 
-//Functions from ANMInteraction.h
-//Stolen due to inheritance issues
-
-
+//Functions almost Identical to those in ANMInteraction
 number DNANMInteraction::_protein_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces) {
     // this is a bit faster than calling r.norm()
     //changed to a quartic form
@@ -579,8 +561,8 @@ number DNANMInteraction::_protein_exc_volume(BaseParticle *p, BaseParticle *q, b
         p->force -= force;
         q->force += force;
         if(_angular){
-            p->torque += p->orientationT*(_computed_r/2).cross(-force);
-            q->torque += q->orientationT*(-_computed_r/2).cross(force);
+            p->torque += p->orientationT*(_computed_r*0.5).cross(-force);
+            q->torque += q->orientationT*(-_computed_r*0.5).cross(force);
         }
     }
 
@@ -640,7 +622,7 @@ number DNANMInteraction::_protein_ang_pot(BaseParticle *p, BaseParticle *q, bool
     double o4 = a3 * b3 - d0;
 
     //Torsion and Bending
-    number energy = _k_bend / 2 * (SQR(o1) + SQR(o2)) + _k_tor / 2 * (SQR(o3) + SQR(o4));
+    number energy = _k_bend * 0.5f * (SQR(o1) + SQR(o2)) + _k_tor * 0.5f * (SQR(o3) + SQR(o4));
 
     if (update_forces) {
 

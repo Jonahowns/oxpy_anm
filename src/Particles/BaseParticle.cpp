@@ -48,6 +48,8 @@ void BaseParticle::copy_from(const BaseParticle &p) {
 	esn5 = p.esn5;
 	n3 = p.n3;
 	n5 = p.n5;
+	mass = p.mass;
+	massinverted = p.massinverted;
 
 	int_centers = p.int_centers;
 

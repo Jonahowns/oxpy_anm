@@ -1174,7 +1174,7 @@ template< bool qisN3>
 __forceinline__ __device__ void ang_pot(c_number4 &dF, c_number4 &dT, const c_number4 &a1, const c_number4 &a3, const c_number4 &b1, const c_number4 &b3, const c_number4 &r, const c_number4 &ang_params, c_number (&kbkt)[2]) {
     dF.x = dF.y = dF.z = dF.w = (c_number) 0.;
     dT.x = dT.y = dT.z = dT.w = (c_number) 0.;
-    c_number4 rij = make_c_number4(r.x/_module(r), r.y/_module(r), r.z/_module(r), 0.);
+    c_number4 rij = _normalize(r);
     c_number4 rji = -1.f * rij;
 
     c_number o1 = (CUDA_DOT(rij, a1)) - ang_params.x;
@@ -1183,7 +1183,7 @@ __forceinline__ __device__ void ang_pot(c_number4 &dF, c_number4 &dT, const c_nu
     c_number o4 = (CUDA_DOT(a3, b3)) - ang_params.w;
     c_number& kb = kbkt[0];
     c_number& kt = kbkt[1];
-    c_number energy = kb / 2 * (SQR(o1) + SQR(o2)) + kt / 2 * (SQR(o3) + SQR(o4));
+    c_number energy = kb * 0.5f * (SQR(o1) + SQR(o2)) + kt * 0.5f * (SQR(o3) + SQR(o4));
 
     if (qisN3) {
         c_number4 F = -1*(((_cross(rji, _cross(rij, a1))) * kb * o1) -
@@ -1283,7 +1283,7 @@ __forceinline__ __device__ void excluded_volume_quart_ang(const c_number4 &r, c_
             F.w = 4.f * EXCL_EPS * (SQR(lj_part) - lj_part);
         }
 
-        T += _cross(_normalize(r)*(MD_pro_sigma/2), F); //add torque
+        T += _cross(_normalize(r)*(MD_pro_sigma*0.5f), F); //add torque
     }
 
 
