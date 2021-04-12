@@ -26,7 +26,7 @@ steps = 1000
 dt = 0.002
 newtonian_steps=51
 diff_coeff=1
-thermostat=john
+thermostat=no
 refresh_vel=1
 
 ### MC PARAMS ###

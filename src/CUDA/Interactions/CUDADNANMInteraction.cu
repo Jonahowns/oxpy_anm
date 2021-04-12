@@ -308,10 +308,6 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
 
     } else OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
 
-    // Copied from CUDADNAINTERACTION
-//    this->DNANMInteraction::init();
-//    DNAInteraction::init();
-
     float f_copy = this->_hb_multiplier;
     CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_hb_multi, &f_copy, sizeof(float)) );
     CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_N, &N, sizeof(int)) );
@@ -360,8 +356,7 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
     CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_minus_kappa, &_minus_kappa, sizeof(float)) );
     CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_half_charged_ends, &_debye_huckel_half_charged_ends, sizeof(bool)) );
 
-    //Constants for DNA/Protein Interactions
-    //NEW VERSION #QuarticExcludedVolume
+    //Constants for DNA/Protein Excluded Volume Interactions
     //Backbone-Protein Excluded Volume Parameters
     _pro_backbone_sigma = 0.57f;
     _pro_backbone_rstar= 0.569f;

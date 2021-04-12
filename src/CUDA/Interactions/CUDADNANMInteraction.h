@@ -33,7 +33,7 @@ public:
 
     float _pro_backbone_sigma, _pro_backbone_rstar, _pro_backbone_b, _pro_backbone_rcut, _pro_backbone_sqr_rcut;
     float _pro_base_sigma, _pro_base_rstar, _pro_base_b, _pro_base_rcut, _pro_base_sqr_rcut;
-    float _pro_sigma, _pro_rstar, _pro_b, _pro_rcut, _pro_sqr_rcut;
+    float _pro_rstar, _pro_b, _pro_rcut, _pro_sqr_rcut, _pro_sigma;
     float _ktor, _kbend;
 
     c_number *_spring_eqdist, *_spring_potential; //Temp arrays for parameter storage

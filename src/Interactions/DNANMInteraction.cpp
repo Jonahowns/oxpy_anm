@@ -449,12 +449,13 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
             protein->force += force;
             if(_angular){
                 r_to_back.normalize();
-                protein->torque += p->orientationT*(r_to_back*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+                protein->torque += p->orientationT*(-r_to_back*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
             }
         }
     }
 
     if(r_to_base.norm() < _pro_base_sqr_rcut){
+        printf("pro %d dna %d\n", protein->index, nuc->index);
         energy += _protein_dna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
         if(update_forces) {
             torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(-force);
@@ -463,7 +464,7 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
             protein->force += force;
             if(_angular){
                 r_to_base.normalize();
-                protein->torque += p->orientationT*(r_to_base*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+                protein->torque += p->orientationT*(-r_to_base*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
             }
         }
     }
