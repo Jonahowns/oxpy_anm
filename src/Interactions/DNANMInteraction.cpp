@@ -4,9 +4,7 @@
  *  Created on: Apr 17, 2019
  *      Author: jonah
  *  Inherits from the DNA2Interaction Class
- *  Uses DNA2 Model and ACProtein Model
- *  ACProtein Functions are implemented here as to avoid a multitude of multiple inheritance
- *  problems of which I am unsure are truly solvable
+ *  Uses DNA2 Model and ANM Protein Model
  */
 
 
@@ -230,7 +228,7 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             allocate_particles(particles);
             for (int j = 0; j < my_N; j++) {
                 particles[j]->index = j;
-                particles[j]->type = 26; //A_INVALID
+                particles[j]->type = P_INVALID;
                 particles[j]->strand_id = 0;
             }
         }
