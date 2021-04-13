@@ -165,7 +165,6 @@ void DNANMInteraction::check_input_sanity(std::vector<BaseParticle*> &particles)
 }
 
 
-
 void DNANMInteraction::allocate_particles(std::vector<BaseParticle*> &particles) {
     if (ndna==0 || ndnas==0) {
         OX_LOG(Logger::LOG_INFO, "No DNA Particles Specified, Continuing with just Protein Particles");
@@ -343,7 +342,6 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
     *N_strands = my_N_strands;
 
 }
-
 
 
 number DNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
@@ -604,6 +602,7 @@ number DNANMInteraction::_protein_spring(BaseParticle *p, BaseParticle *q, bool 
     return energy;
 }
 
+
 number DNANMInteraction::_protein_ang_pot(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
     // Get Angular Parameters
     std::vector<double> &ang_params = _ang_vals[p->index];
@@ -669,6 +668,7 @@ number DNANMInteraction::_protein_ang_pot(BaseParticle *p, BaseParticle *q, bool
 
     return energy;
 }
+
 
 void DNANMInteraction::load_massfile(std::string &filename) {
     std::fstream mass_stream;
