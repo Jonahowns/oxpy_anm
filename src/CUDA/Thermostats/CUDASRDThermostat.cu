@@ -108,7 +108,9 @@ bool CUDASRDThermostat::would_activate(llint curr_step) {
 	return (curr_step % this->_apply_every == 0);
 }
 
-void CUDASRDThermostat::apply_cuda(c_number4 *d_poss, GPU_quat *d_orientations, c_number4 *d_vels, c_number4 *d_Ls, llint curr_step) {
+// DIRTY HACK I KNOW, a more elegant solution may come to me later
+//NOTE: Despite the addition of _d_mass to the function call, this in no way takes into account the masses
+void CUDASRDThermostat::apply_cuda(c_number *_d_mass, c_number4 *d_poss, GPU_quat *d_orientations, c_number4 *d_vels, c_number4 *d_Ls, llint curr_step) {
 	if(!would_activate(curr_step)) return;
 
 	// reset cells

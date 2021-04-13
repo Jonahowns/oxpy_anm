@@ -26,7 +26,7 @@ steps = 2000
 dt = 0.002
 newtonian_steps=51
 diff_coeff=1
-thermostat=john
+thermostat=langevin
 refresh_vel=1
 
 ### MC PARAMS ###
@@ -47,6 +47,7 @@ torsion_k = 15.0
 ####    INPUT / OUTPUT    ####
 ##############################
 parfile = kdpg_anm.par
+massfile = massfile.txt
 topology = generated.top
 conf_file = s1.dat
 trajectory_file = trajectory.dat

@@ -55,9 +55,11 @@ public:
     };
 
     char _parameterfile[512];
+    std::string _massfile;
     bool _angular;
 
     DNANMInteraction(bool btp); //btn controls whether bending/torsion potential is applied
+    void load_massfile(std::string &filename);
     virtual ~DNANMInteraction();
     virtual void get_settings(input_file &inp);
     virtual void allocate_particles(std::vector<BaseParticle *> &particles);

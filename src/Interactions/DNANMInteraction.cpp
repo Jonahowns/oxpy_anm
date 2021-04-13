@@ -44,7 +44,7 @@ DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress(
 
     _parameter_kbkt = false;
 
-    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everythin
+    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everything
               {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
               {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
               {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
@@ -74,7 +74,14 @@ void DNANMInteraction::get_settings(input_file &inp){
         }
     }
 
-    getInputString(&inp, "parfile", _parameterfile, 0);
+    getInputString(&inp, "parfile", _parameterfile, 0); //parameter file
+
+    if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) { // variable mass file
+        OX_LOG(Logger::LOG_INFO, "Using Default Masses"); // declared in constructor
+    } else {
+        OX_LOG(Logger::LOG_INFO, "Using Provided Massfile");
+        load_massfile(_massfile);
+    }
     //Addition of Reading Parameter File
 
     auto valid_spring_params = [](int N, int x, int y, double d, char s, double k){
@@ -275,6 +282,9 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 p->btype = Utils::decode_aa(aminoacid[0]);
             }
 
+            p->mass = masses[p->btype];
+            p->massinverted = 1.f/p->mass;
+
             p->strand_id = abs(strand) + ndnas - 1;
             p->index = i;
 
@@ -307,6 +317,9 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             }
 
             if (p->type == P_INVALID) throw oxDNAException("Particle #%d in strand #%d contains a non valid base '%c'. Aborting", i, strand, base);
+
+            p->mass = 1.f;
+            p->massinverted = 1.f;
 
             p->index = i;
             i++;
@@ -659,6 +672,21 @@ number DNANMInteraction::_protein_ang_pot(BaseParticle *p, BaseParticle *q, bool
     return energy;
 }
 
+void DNANMInteraction::load_massfile(std::string &filename) {
+    std::fstream mass_stream;
+    int masstypes;
+    mass_stream.open(filename, std::ios::in);
+    if(mass_stream.is_open()) {
+        int type;
+        number mass;
+        mass_stream >> masstypes;
+        masses.clear(); // remove default masses
+        while (mass_stream >> type >> mass) {
+            masses[type] = (number) mass;
+        }
+    } else
+        throw oxDNAException("Could Not Load Mass File, Aborting");
+}
 
 
 DNANMInteraction::~DNANMInteraction() {

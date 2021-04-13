@@ -175,6 +175,8 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 		}
 
 		_h_mass[i] = _massvalues[p->btype]; // fill _h_mass array
+		//debug
+//		printf("particle %d, btype %d, _massvals[btype] %.3f, mass %.3f\n", i, p->btype, _massvalues[p->btype], _h_mass[i]);
 
 		if(p->index != myindex) {
 			throw oxDNAException("Could not treat the index of particle %d; remember that on CUDA the maximum c_number of particles is 2^21", p->index);
@@ -432,7 +434,7 @@ void MD_CUDABackend::_apply_barostat(llint curr_step) {
 
 	if(_cuda_barostat_always_refresh) {
 		// if the user wishes so, we refresh all the velocities after each barostat attempt
-		_cuda_barostat_thermostat->apply_cuda(_d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
+		_cuda_barostat_thermostat->apply_cuda(_d_mass, _d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
 	}
 }
 
@@ -471,7 +473,7 @@ void MD_CUDABackend::_sort_particles() {
 }
 
 void MD_CUDABackend::_thermalize(llint curr_step) {
-	_cuda_thermostat->apply_cuda(_d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
+	_cuda_thermostat->apply_cuda(_d_mass, _d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
 }
 
 void MD_CUDABackend::sim_step(llint curr_step) {
@@ -545,9 +547,16 @@ void MD_CUDABackend::get_settings(input_file &inp) {
 
     if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) {
         OX_LOG(Logger::LOG_INFO, "Using Default Masses");
+        _massvalues = new c_number[26]();
+        for(int i = 0; i < 26; i++) _massvalues[i] = (c_number) 1.0;
     } else {
+        OX_LOG(Logger::LOG_INFO, "Using Provided Massfile");
         load_massfile(_massfile);
     }
+    //Debug
+//    for(int i =0; i < 25; i++){
+//        printf("btype %d massval %.3f\n", i, _massvalues[i]);
+//    }
 
 	getInputBool(&inp, "restart_step_counter", &_restart_step_counter, 1);
 	getInputBool(&inp, "CUDA_avoid_cpu_calculations", &_avoid_cpu_calculations, 0);
@@ -615,8 +624,7 @@ void MD_CUDABackend::init() {
 	_h_torques = new c_number4[N()];
 
 	_h_mass = new c_number[N()]; //variable masses
-    _massvalues = new c_number[26]();
-    for(int i = 0; i < 26; i++) _massvalues[i] = (c_number) 1.0;
+
 
 	_obs_output_error_conf->init();
 

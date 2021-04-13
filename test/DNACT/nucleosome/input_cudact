@@ -46,6 +46,7 @@ torsion_k = 15.0
 ##############################
 ####    INPUT / OUTPUT    ####
 ##############################
+massfile = massfile.txt
 parfile = generated.par
 topology = hist_comp.top
 conf_file = hist_compr.dat
