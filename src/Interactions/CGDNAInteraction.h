@@ -41,12 +41,15 @@ protected:
     std::map<std::pair<int, int>, double> _rknot; //Both maps used just as they are in ACInteraction
     std::map<std::pair<int, int>, std::pair<char, double> > _potential;
     std::map<int, number> masses;
+    std::map<int, number> radii;
     bool _parameter_kbkt; //Controls whether kb/kt values are global or read from parameter file
     std::map<int, std::pair<double, double> > _ang_stiff; // Stores per particle pair, kb kt values
     number _k_bend, _k_tor;
     std::map<int, std::vector <double> > _ang_vals;
     number _pro_sigma, _pro_rstar, _pro_b, _pro_rcut; // Protein-protein quartic LJ params same as in ANM
     number _pro_base_sqr_rcut, _pro_backbone_sqr_rcut, _pro_sqr_rcut, _pro_dna_sqr_rcut;
+    float *_gs_exc_vol_params;
+
 
     bool _fill_in_constants(number interaction_radius, number& sigma, number& rstar, number &b, number &rc)
     {
@@ -108,8 +111,9 @@ public:
         PRO_EXC_VOL = 9,
         PRO_DNA_EXC_VOL = 10,
         PRO_ANG_POT = 11,
-        GS_DNA_EXC_VOL = 12,
-        GS_PRO_EXC_VOL = 13
+        GS_EXC_VOL = 12,
+        GS_DNA_EXC_VOL = 13,
+        GS_PRO_EXC_VOL = 14
         //Assigned 8 9 and 10 so it won't overwrite the already existing DNA function pointers in the _int_map
     };
 

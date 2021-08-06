@@ -30,6 +30,7 @@ CGDNAInteraction::CGDNAInteraction(bool btp) : DNA2Interaction() { // @suppress(
     _int_map[PRO_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_dna_exc_volume;
 
     //GS-DNA Function Pointers
+    _int_map[GS_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_dna_exc_volume;
     _int_map[GS_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_dna_exc_volume;
     _int_map[GS_PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_protein_exc_volume;
 
@@ -49,6 +50,12 @@ CGDNAInteraction::CGDNAInteraction(bool btp) : DNA2Interaction() { // @suppress(
               {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
               {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
               {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
+
+    radii = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everything
+              {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
+              {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
+              {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
+
 }
 
 
@@ -78,7 +85,8 @@ void CGDNAInteraction::get_settings(input_file &inp){
     getInputString(&inp, "parfile", _parameterfile, 0); //parameter file
 
     if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) { // variable mass file
-        OX_LOG(Logger::LOG_INFO, "Using Default Masses"); // declared in constructor
+//        OX_LOG(Logger::LOG_INFO, "Using Default Masses"); // declared in constructor
+        throw oxDNAException("Mass File Must be provided for CGDNA Interaction");
     } else {
         OX_LOG(Logger::LOG_INFO, "Using Provided Massfile");
         load_massfile(_massfile);
@@ -207,10 +215,15 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
     topology.getline(line, 5120);
     std::stringstream head(line);
 
-    head >> my_N >> my_N_strands >> ndna >> npro >>ndnas;
+    head >> my_N >> my_N_strands >> ndna >> npro >>ndnas >> npep;
+    ngstrands = my_N_strands - ndnas - npep;
+    ngs = my_N - ndna - npro;
     if (head.fail()) throw oxDNAException("Problem with header make sure the format is correct for CGDNA Interaction");
 
-    if(my_N_strands < 0 || my_N_strands > my_N || ndna > my_N || ndna < 0 || npro > my_N || npro < 0 || ndnas < 0 || ndnas > my_N) {
+
+
+    if(my_N_strands < 0 || my_N_strands > my_N || ndna > my_N || ndna < 0 || npro > my_N || npro < 0 || ndnas < 0
+            || ndnas > my_N || npep < 0 || npep > my_N || ngstrands < 0 || ngstrands > my_N) {
         throw oxDNAException("Problem with header make sure the format is correct for CGDNA Interaction");
     }
 
@@ -680,10 +693,12 @@ void CGDNAInteraction::load_massfile(std::string &filename) {
     if(mass_stream.is_open()) {
         int type;
         number mass;
+        number radius;
         mass_stream >> masstypes;
         masses.clear(); // remove default masses
-        while (mass_stream >> type >> mass) {
+        while (mass_stream >> type >> mass >> radius) {
             masses[type] = (number) mass;
+            radii[type] = (number) radius;
         }
     } else
         throw oxDNAException("Could Not Load Mass File, Aborting");

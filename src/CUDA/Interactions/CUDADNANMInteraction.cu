@@ -24,13 +24,13 @@ CUDADNANMInteraction::CUDADNANMInteraction(bool btp) : DNANMInteraction(btp), CU
     _spring_eqdist = NULL;
     _affected_len = NULL;
 
+    //Copied over to device memory
     _h_ang_params = NULL;
     _d_ang_params = NULL;
 
     _h_ang_kbkt = NULL;
     _d_ang_kbkt = NULL;
 
-    //Copied over to device memory
     _h_affected_indx = NULL;
     _d_affected_indx = NULL;
 
