@@ -12,7 +12,7 @@
 #include <curand_kernel.h>
 
 //added support for different masses
-__global__ void langevin_thermostat(curandState *rand_state, c_number *masses, c_number4 *vels, c_number4 *Ls, c_number _dt, c_number gamma_trans, c_number rescale_factor_trans, c_number gamma_rot, c_number rescale_factor_rot, int N) {
+__global__ void langevin_thermostat(curandState *rand_state, c_number *massesInv, c_number4 *vels, c_number4 *Ls, c_number _dt, c_number gamma_trans, c_number rescale_factor_trans, c_number gamma_rot, c_number rescale_factor_rot, int N) {
 	if(IND < N) {
 		curandState state = rand_state[IND];
 		c_number4 vFuzz;
@@ -25,9 +25,9 @@ __global__ void langevin_thermostat(curandState *rand_state, c_number *masses, c
 		c_number4 L = Ls[IND];
 
 		//Could define operators for GPU_quat
-		v.x += _dt * (-gamma_trans * v.x + vFuzz.x * rescale_factor_trans/sqrtf(masses[IND]));
-		v.y += _dt * (-gamma_trans * v.y + vFuzz.y * rescale_factor_trans/sqrtf(masses[IND]));
-		v.z += _dt * (-gamma_trans * v.z + vFuzz.z * rescale_factor_trans/sqrtf(masses[IND]));
+		v.x += _dt * (-gamma_trans * v.x + vFuzz.x * rescale_factor_trans*sqrtf(massesInv[IND]));
+		v.y += _dt * (-gamma_trans * v.y + vFuzz.y * rescale_factor_trans*sqrtf(massesInv[IND]));
+		v.z += _dt * (-gamma_trans * v.z + vFuzz.z * rescale_factor_trans*sqrtf(massesInv[IND]));
 		L.x += _dt * (-gamma_rot * L.x + LFuzz.x * rescale_factor_rot);
 		L.y += _dt * (-gamma_rot * L.y + LFuzz.y * rescale_factor_rot);
 		L.z += _dt * (-gamma_rot * L.z + LFuzz.z * rescale_factor_rot);

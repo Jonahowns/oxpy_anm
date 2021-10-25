@@ -52,13 +52,13 @@ struct compute_K_without_com {
 };
 
 //added support for different masses, honestly no idea if it's correct
-__global__ void bussi_thermostat(c_number *masses, c_number4 *vels, c_number4 *Ls, c_number4 v_com, c_number rescale_factor_t, c_number rescale_factor_r, int N) {
+__global__ void bussi_thermostat(c_number *massesInv, c_number4 *vels, c_number4 *Ls, c_number4 v_com, c_number rescale_factor_t, c_number rescale_factor_r, int N) {
 	if(IND >= N) return;
 
 	c_number4 v = vels[IND];
-	v.x = (v.x - v_com.x) * rescale_factor_t/sqrt(masses[IND]) + v_com.x;
-	v.y = (v.y - v_com.y) * rescale_factor_t/sqrt(masses[IND]) + v_com.y;
-	v.z = (v.z - v_com.z) * rescale_factor_t/sqrt(masses[IND]) + v_com.z;
+	v.x = (v.x - v_com.x) * rescale_factor_t*sqrt(massesInv[IND]) + v_com.x;
+	v.y = (v.y - v_com.y) * rescale_factor_t*sqrt(massesInv[IND]) + v_com.y;
+	v.z = (v.z - v_com.z) * rescale_factor_t*sqrt(massesInv[IND]) + v_com.z;
 	v.w = (v.x * v.x + v.y * v.y + v.z * v.z) * (c_number) 0.5f;
 	vels[IND] = v;
 

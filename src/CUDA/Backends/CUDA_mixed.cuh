@@ -20,14 +20,14 @@ __device__ GPU_quat_double _get_updated_orientation(LR_double4 &L, GPU_quat_doub
 	return quat_multiply(old_o, R);
 }
 
-__global__ void first_step_mixed(float *masses, float4 *poss, GPU_quat *orientations, LR_double4 *possd, GPU_quat_double *orientationsd, float4 *list_poss, LR_double4 *velsd, LR_double4 *Lsd, float4 *forces, float4 *torques, bool *are_lists_old, bool any_rigid_body) {
+__global__ void first_step_mixed(float *massesInv, float4 *poss, GPU_quat *orientations, LR_double4 *possd, GPU_quat_double *orientationsd, float4 *list_poss, LR_double4 *velsd, LR_double4 *Lsd, float4 *forces, float4 *torques, bool *are_lists_old, bool any_rigid_body) {
 	if(IND >= MD_N[0]) return;
 
 	float4 F = forces[IND];
 
 	LR_double4 v = velsd[IND];
 
-	const c_number scale_factor = MD_dt[0] * 0.5f / masses[IND];
+	const c_number scale_factor = MD_dt[0] * 0.5f * massesInv[IND];
 
 	v.x += F.x * scale_factor;
 	v.y += F.y * scale_factor;
@@ -68,13 +68,13 @@ __global__ void first_step_mixed(float *masses, float4 *poss, GPU_quat *orientat
 	if(quad_distance(rf, list_poss[IND]) > MD_sqr_verlet_skin[0]) are_lists_old[0] = true;
 }
 
-__global__ void second_step_mixed(float* masses, LR_double4 *velsd, LR_double4 *Lsd, float4 *forces, float4 *torques, bool any_rigid_body) {
+__global__ void second_step_mixed(float* massesInv, LR_double4 *velsd, LR_double4 *Lsd, float4 *forces, float4 *torques, bool any_rigid_body) {
 	if(IND >= MD_N[0]) return;
 
 	float4 F = forces[IND];
 	LR_double4 v = velsd[IND];
     const c_number scale_factor = MD_dt[0] * 0.5f;
-    const c_number scale_factor_mass = MD_dt[0] * 0.5f * masses[IND];
+    const c_number scale_factor_mass = MD_dt[0] * 0.5f * massesInv[IND];
 
 	v.x += (F.x * scale_factor_mass);
 	v.y += (F.y * scale_factor_mass);

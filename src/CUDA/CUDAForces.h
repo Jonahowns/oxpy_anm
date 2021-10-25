@@ -21,7 +21,7 @@
 #define CUDA_GENERIC_CENTRAL_FORCE 9
 #define CUDA_LJ_CONE 10
 #define CUDA_REPULSIVE_SPHERE_SMOOTH 11
-
+#define CUDA_TRAP_SKEW 12
 /**
  * @brief CUDA version of a ConstantRateForce.
  */
@@ -45,6 +45,22 @@ struct mutual_trap {
 	int p_ind;
 	bool PBC;
 	c_number rate;
+};
+
+/**
+ * @brief CUDA version of a SkewTrap.
+ */
+
+struct skew_trap {
+    int type;
+    c_number stdev;
+    c_number r0;
+    c_number a;
+    int p_ind;
+    bool PBC;
+    c_number rate;
+    c_number val1;
+    c_number val2;
 };
 
 /**
@@ -185,6 +201,7 @@ union CUDA_trap {
 	constant_rate_force constant;
 	mutual_trap mutual;
 	moving_trap moving;
+	skew_trap skew;
 	lowdim_moving_trap lowdim;
 	repulsion_plane repulsionplane;
 	repulsion_plane_moving repulsionplanemoving;

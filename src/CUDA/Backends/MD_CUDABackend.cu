@@ -20,6 +20,7 @@
 #include "../../Forces/LowdimMovingTrap.h"
 #include "../../Forces/MovingTrap.h"
 #include "../../Forces/MutualTrap.h"
+#include "../../Forces/SkewTrap.h"
 #include "../../Forces/RepulsionPlane.h"
 #include "../../Forces/RepulsionPlaneMoving.h"
 #include "../../Forces/RepulsiveSphere.h"
@@ -44,8 +45,8 @@ MD_CUDABackend::MD_CUDABackend() :
 	_any_rigid_body = false;
 
 	_massvalues = NULL;
-	_h_mass = NULL;
-	_d_mass = NULL; // mass arrays for variable Masses
+	_h_massInv = NULL;
+	_d_massInv = NULL; // mass arrays for variable Masses
 
 	_d_vels = _d_Ls = _d_forces = _d_torques = _d_buff_vels = NULL;
 	_h_vels = _h_Ls = _h_forces = _h_torques = _d_buff_Ls = NULL;
@@ -79,8 +80,8 @@ MD_CUDABackend::~MD_CUDABackend() {
 		CUDA_SAFE_CALL(cudaFree(_d_particles_to_mols));
 	}
 
-	if(_d_mass != NULL) {
-	    CUDA_SAFE_CALL(cudaFree(_d_mass));
+	if(_d_massInv != NULL) {
+	    CUDA_SAFE_CALL(cudaFree(_d_massInv));
 	}
 
 	if(_d_vels != NULL) {
@@ -114,8 +115,8 @@ MD_CUDABackend::~MD_CUDABackend() {
 		}
 	}
 
-	if(_h_mass != NULL){
-	    delete[] _h_mass;
+	if(_h_massInv != NULL){
+	    delete[] _h_massInv;
 	}
 
 	if(_h_vels != NULL) {
@@ -139,7 +140,7 @@ void MD_CUDABackend::_host_to_gpu() {
 	CUDA_SAFE_CALL(cudaMemcpy(_d_particles_to_mols, _h_particles_to_mols.data(), sizeof(int) * N(), cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(_d_vels, _h_vels, _vec_size, cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(_d_Ls, _h_Ls, _vec_size, cudaMemcpyHostToDevice));
-	CUDA_SAFE_CALL(cudaMemcpy(_d_mass, _h_mass, _particles.size() * sizeof(c_number), cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpy(_d_massInv, _h_massInv, _particles.size() * sizeof(c_number), cudaMemcpyHostToDevice));
 }
 
 void MD_CUDABackend::_gpu_to_host() {
@@ -149,7 +150,7 @@ void MD_CUDABackend::_gpu_to_host() {
 	CUDA_SAFE_CALL(cudaMemcpy(_h_Ls, _d_Ls, _vec_size, cudaMemcpyDeviceToHost));
 	CUDA_SAFE_CALL(cudaMemcpy(_h_forces, _d_forces, _vec_size, cudaMemcpyDeviceToHost));
 	CUDA_SAFE_CALL(cudaMemcpy(_h_torques, _d_torques, _vec_size, cudaMemcpyDeviceToHost));
-    CUDA_SAFE_CALL(cudaMemcpy(_h_mass, _d_mass, _particles.size() * sizeof(c_number), cudaMemcpyDeviceToHost));
+    CUDA_SAFE_CALL(cudaMemcpy(_h_massInv, _d_massInv, _particles.size() * sizeof(c_number), cudaMemcpyDeviceToHost));
 }
 
 void MD_CUDABackend::apply_changes_to_simulation_data() {
@@ -174,9 +175,9 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			throw oxDNAException("Could not treat the type (A, C, G, T or something specific) of particle %d; On CUDA, the maximum \"unique\" identity is 512");
 		}
 
-		_h_mass[i] = _massvalues[p->btype]; // fill _h_mass array
+		_h_massInv[i] = 1.f/_massvalues[p->btype]; // fill _h_massInv array
 		//debug
-//		printf("particle %d, btype %d, _massvals[btype] %.3f, mass %.3f\n", i, p->btype, _massvalues[p->btype], _h_mass[i]);
+//		printf("particle %d, btype %d, _massvals[btype] %.3f, mass %.3f\n", i, p->btype, _massvalues[p->btype], _h_massInv[i]);
 
 		if(p->index != myindex) {
 			throw oxDNAException("Could not treat the index of particle %d; remember that on CUDA the maximum c_number of particles is 2^21", p->index);
@@ -257,7 +258,7 @@ void MD_CUDABackend::apply_simulation_data_changes() {
 		p->pos.z = _h_poss[i].z;
 
 		p->strand_id = _h_particles_to_mols[i];
-		p->mass = _h_mass[i];
+		p->mass = _h_massInv[i];
 		p->massinverted = 1.f/p->mass;
 
 		// get index and type from the fourth component of the position
@@ -329,7 +330,7 @@ void MD_CUDABackend::_init_CUDA_MD_symbols() {
 void MD_CUDABackend::_first_step() {
 	first_step
 		<<<_particles_kernel_cfg.blocks, _particles_kernel_cfg.threads_per_block>>>
-		(_d_mass, _d_poss, _d_orientations, _d_list_poss, _d_vels, _d_Ls, _d_forces, _d_torques, _d_are_lists_old);
+		(_d_massInv, _d_poss, _d_orientations, _d_list_poss, _d_vels, _d_Ls, _d_forces, _d_torques, _d_are_lists_old);
 	CUT_CHECK_ERROR("_first_step error");
 }
 
@@ -434,7 +435,7 @@ void MD_CUDABackend::_apply_barostat(llint curr_step) {
 
 	if(_cuda_barostat_always_refresh) {
 		// if the user wishes so, we refresh all the velocities after each barostat attempt
-		_cuda_barostat_thermostat->apply_cuda(_d_mass, _d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
+		_cuda_barostat_thermostat->apply_cuda(_d_massInv, _d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
 	}
 }
 
@@ -444,7 +445,7 @@ void MD_CUDABackend::_forces_second_step() {
 
 	second_step
 		<<<_particles_kernel_cfg.blocks, _particles_kernel_cfg.threads_per_block>>>
-		(_d_mass, _d_vels, _d_Ls, _d_forces, _d_torques);
+		(_d_massInv, _d_vels, _d_Ls, _d_forces, _d_torques);
 	CUT_CHECK_ERROR("second_step");
 }
 
@@ -473,7 +474,7 @@ void MD_CUDABackend::_sort_particles() {
 }
 
 void MD_CUDABackend::_thermalize(llint curr_step) {
-	_cuda_thermostat->apply_cuda(_d_mass, _d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
+	_cuda_thermostat->apply_cuda(_d_massInv, _d_poss, _d_orientations, _d_vels, _d_Ls, curr_step);
 }
 
 void MD_CUDABackend::sim_step(llint curr_step) {
@@ -612,7 +613,7 @@ void MD_CUDABackend::init() {
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<int>(&_d_mol_sizes, sizeof(int) * _molecules.size()));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number4>(&_d_molecular_coms, sizeof(c_number4) * _molecules.size()));
 
-    CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number>(&_d_mass, sizeof(c_number) * N()));
+    CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number>(&_d_massInv, sizeof(c_number) * N()));
 
 	CUDA_SAFE_CALL(cudaMemset(_d_forces, 0, _vec_size));
 	CUDA_SAFE_CALL(cudaMemset(_d_torques, 0, _vec_size));
@@ -623,7 +624,7 @@ void MD_CUDABackend::init() {
 	_h_forces = new c_number4[N()];
 	_h_torques = new c_number4[N()];
 
-	_h_mass = new c_number[N()]; //variable masses
+	_h_massInv = new c_number[N()]; //variable masses
 
 
 	_obs_output_error_conf->init();
@@ -648,6 +649,7 @@ void MD_CUDABackend::init() {
 
 		ConstantRateForce const_force;
 		MutualTrap mutual_trap;
+		SkewTrap skew_trap;
 		MovingTrap moving_trap;
 		LowdimMovingTrap lowdim_moving_trap;
 		RepulsionPlane repulsion_plane;
@@ -685,6 +687,18 @@ void MD_CUDABackend::init() {
 					force->mutual.p_ind = p_force->_p_ptr->index;
 					force->mutual.PBC = p_force->PBC;
 				}
+				else if(typeid (*(p->ext_forces[j].get())) == typeid(skew_trap)) {
+                    SkewTrap *p_force = (SkewTrap*) p->ext_forces[j].get();
+                    force->type = CUDA_TRAP_SKEW;
+                    force->skew.rate = p_force->_rate;
+                    force->skew.stdev = p_force->_s;
+                    force->skew.a = p_force->_a;
+                    force->skew.r0 = p_force->_r0;
+                    force->skew.p_ind = p_force->_p_ptr->index;
+                    force->skew.PBC = p_force->PBC;
+                    force->skew.val1 = p_force->_val3;
+                    force->skew.val2 = p_force->_val4;
+                }
 				else if(typeid (*(p->ext_forces[j].get())) == typeid(moving_trap)) {
 					MovingTrap *p_force = (MovingTrap*) p->ext_forces[j].get();
 					force->type = CUDA_TRAP_MOVING;

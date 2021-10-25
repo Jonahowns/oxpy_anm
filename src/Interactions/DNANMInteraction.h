@@ -58,20 +58,20 @@ public:
     std::string _massfile;
     bool _angular;
 
-    DNANMInteraction(bool btp); //btn controls whether bending/torsion potential is applied
-    void load_massfile(std::string &filename);
-    virtual ~DNANMInteraction();
-    virtual void get_settings(input_file &inp);
-    virtual void allocate_particles(std::vector<BaseParticle *> &particles);
-    virtual void read_topology(int *N_strands, std::vector<BaseParticle *> &particles);
-    void load_masses(std::string &massfile);
-    virtual number pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
-    virtual number pair_interaction_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
-    virtual number pair_interaction_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    explicit DNANMInteraction(bool btp); //btn controls whether bending/torsion potential is applied
+    virtual void load_massfile(std::string &filename);
+    ~DNANMInteraction() override;
+    void get_settings(input_file &inp) override;
+    void allocate_particles(std::vector<BaseParticle *> &particles) override;
+    void read_topology(int *N_strands, std::vector<BaseParticle *> &particles) override;
+
+    number pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) override;
+    number pair_interaction_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) override;
+    number pair_interaction_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) override;
     number _protein_dna_exc_volume(BaseParticle *p,BaseParticle *q, bool compute_r, bool update_forces);
     number _protein_dna_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness);
-    virtual void check_input_sanity(std::vector<BaseParticle *> &particles);
-    virtual void init();
+    void check_input_sanity(std::vector<BaseParticle *> &particles) override;
+    void init() override;
     virtual number _protein_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces);
     virtual number _protein_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     virtual number _protein_spring(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);

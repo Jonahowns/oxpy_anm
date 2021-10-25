@@ -17,7 +17,7 @@
 #include "../Particles/ANMTParticle.h"
 
 
-DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() { // @suppress("Class members should be properly initialized")
+DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() {
     // TODO: Re-examine These
 
     _angular = btp;
@@ -121,17 +121,21 @@ void DNANMInteraction::get_settings(input_file &inp){
                 //If DNACT
                 if(_angular) {
                     if (key2 - key1 == 1) {
-                        parameters >> a0 >> b0 >> c0 >> d0;
-                        valid_angles(a0, b0, c0, d0);
-                        if (_parameter_kbkt) {
-                            parameters >> _k_bend >> _k_tor;
-                            if (_k_bend < 0 || _k_tor < 0)
-                                throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File");
-                            std::pair<double, double> ang_constants(_k_bend, _k_tor);
-                            _ang_stiff[key1] = ang_constants;
+                        try {
+                            parameters >> a0 >> b0 >> c0 >> d0;
+                            valid_angles(a0, b0, c0, d0);
+                            if (_parameter_kbkt) {
+                                parameters >> _k_bend >> _k_tor;
+                                if (_k_bend < 0 || _k_tor < 0)
+                                    throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File");
+                                std::pair<double, double> ang_constants(_k_bend, _k_tor);
+                                _ang_stiff[key1] = ang_constants;
+                            }
+                            std::vector<double> angles{a0, b0, c0, d0};
+                            _ang_vals[key1] = angles;
+                        } catch(...){
+                            continue;
                         }
-                        std::vector<double> angles{a0, b0, c0, d0};
-                        _ang_vals[key1] = angles;
                     }
                 }
                 std::pair <int, int> lkeys (key1, key2);
@@ -464,7 +468,7 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
     }
 
     if(r_to_base.norm() < _pro_base_sqr_rcut){
-        printf("pro %d dna %d\n", protein->index, nuc->index);
+//        printf("pro %d dna %d\n", protein->index, nuc->index);
         energy += _protein_dna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
         if(update_forces) {
             torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(-force);
@@ -687,8 +691,7 @@ void DNANMInteraction::load_massfile(std::string &filename) {
 }
 
 
-DNANMInteraction::~DNANMInteraction() {
-}
+DNANMInteraction::~DNANMInteraction() = default;
 
 
 

@@ -1,7 +1,7 @@
 /*
  * CGDNAInteraction.cpp
  *
- *  Created on: Apr 17, 2019
+ *  Created on: Aug 13, 2021
  *      Author: jonah
  *  Inherits from the DNA2Interaction Class
  *  Uses DNA2 Model and ANM Protein Model and CG DNA model
@@ -16,40 +16,46 @@
 #include "../Particles/ANMParticle.h"
 #include "../Particles/ANMTParticle.h"
 
-
-CGDNAInteraction::CGDNAInteraction(bool btp) : DNA2Interaction() { // @suppress("Class members should be properly initialized")
+CGDNAInteraction::CGDNAInteraction(bool btp) : DNANMInteraction(btp) { // @suppress("Class members should be properly initialized")
     // TODO: Re-examine These
 
-    _angular = btp;
+//    _angular = btp;
     //Protein Methods Function Pointers
-    _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_spring;
-    _int_map[PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_exc_volume;
-    if(_angular) _int_map[PRO_ANG_POT] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_ang_pot;
-
-    //Protein-DNA Function Pointers
-    _int_map[PRO_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_dna_exc_volume;
+//    _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_spring;
+//    _int_map[PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_exc_volume;
+//    if(_angular) _int_map[PRO_ANG_POT] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_ang_pot;
+//
+//    //Protein-DNA Function Pointers
+//    _int_map[PRO_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_dna_exc_volume;
 
     //GS-DNA Function Pointers
-    _int_map[GS_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_dna_exc_volume;
+    _int_map[GS_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_exc_volume;
     _int_map[GS_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_dna_exc_volume;
-    _int_map[GS_PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_protein_exc_volume;
+    _int_map[GS_PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_pro_exc_volume;
 
     //DNA Methods Function Pointers
-    _int_map[BACKBONE] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_backbone;
-    _int_map[COAXIAL_STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_coaxial_stacking;
-    _int_map[CROSS_STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_cross_stacking;
-    _int_map[BONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_bonded_excluded_volume;
-    _int_map[STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_stacking;
-    _int_map[HYDROGEN_BONDING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_hydrogen_bonding;
-    _int_map[NONBONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_nonbonded_excluded_volume;
-    _int_map[DEBYE_HUCKEL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_debye_huckel;
+//    _int_map[BACKBONE] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_backbone;
+//    _int_map[COAXIAL_STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_coaxial_stacking;
+//    _int_map[CROSS_STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_cross_stacking;
+//    _int_map[BONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_bonded_excluded_volume;
+//    _int_map[STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_stacking;
+//
+//    _int_map[HYDROGEN_BONDING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_hydrogen_bonding;
+//    _int_map[NONBONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_nonbonded_excluded_volume;
+//    _int_map[DEBYE_HUCKEL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &CGDNAInteraction::_debye_huckel;
 
-    _parameter_kbkt = false;
+//    _parameter_kbkt = false;
 
-    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everything
-              {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
-              {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
-              {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
+    gs_subtype_num = -1; // gives number of unique gs particles
+    _gs_gs_exc_vol_params = nullptr;
+    _gs_other_exc_vol_params = nullptr;
+
+    topology_order = {-1, -1, -1}; // Number of different particle types
+
+//    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everything
+//              {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
+//              {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
+//              {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
 
     radii = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everything
               {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
@@ -58,150 +64,47 @@ CGDNAInteraction::CGDNAInteraction(bool btp) : DNA2Interaction() { // @suppress(
 
 }
 
-
 void CGDNAInteraction::get_settings(input_file &inp){
-    this->DNA2Interaction::get_settings(inp);
-
-    if(_angular){
-        float kb_tmp = -1.f;
-        float kt_tmp = -1.f;
-        getInputString(&inp, "parfile", _parameterfile, 1);
-        getInputFloat(&inp, "bending_k", &kb_tmp, 0);
-        _k_bend = (number) kb_tmp;
-
-        getInputFloat(&inp, "torsion_k", &kt_tmp, 0);
-        _k_tor = (number) kt_tmp;
-
-        if((_k_bend < 0 && kt_tmp >= 0) || (_k_tor < 0 && _k_bend >= 0)){
-            throw oxDNAException("Bending & Torsion Constants Must BOTH be set globally or in parameter file");
-        } else if(_k_bend >= 0 && _k_tor >= 0){
-            OX_LOG(Logger::LOG_INFO, "Using Global kb/kt values set in Input File");
-        } else if(_k_bend < 0 && _k_tor < 0){
-            OX_LOG(Logger::LOG_INFO, "No Global kb/kt values set in Input File, Attempting to read from Parameter File");
-            _parameter_kbkt = true;
-        }
-    }
-
-    getInputString(&inp, "parfile", _parameterfile, 0); //parameter file
+    this->DNANMInteraction::get_settings(inp);
+    // reads par file
+    // sets up ANMT parameters if needed
+    // reads mass file, the masses array is overwritten in the below code
 
     if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) { // variable mass file
-//        OX_LOG(Logger::LOG_INFO, "Using Default Masses"); // declared in constructor
         throw oxDNAException("Mass File Must be provided for CGDNA Interaction");
-    } else {
-        OX_LOG(Logger::LOG_INFO, "Using Provided Massfile");
-        load_massfile(_massfile);
-    }
-    //Addition of Reading Parameter File
-
-    auto valid_spring_params = [](int N, int x, int y, double d, char s, double k){
-        if(x < 0 || x > N) throw oxDNAException("Invalid Particle ID %d in Parameter File", x);
-        if(y < 0 || y > N) throw oxDNAException("Invalid Particle ID %d in Parameter File", y);
-        if(d < 0) throw oxDNAException("Invalid Eq Distance %d in Parameter File", d);
-        if(s != 's') throw oxDNAException("Potential Type %c Not Supported", s);
-        if(k < 0) throw oxDNAException("Spring Constant %f Not Supported", k);
-    };
-
-    //Checkers as Lambdas
-    auto valid_angles = [](double a, double b, double c, double d)
-    {
-        double anglemin = std::min({a, b, c, d});
-        double anglemax = std::max({a, b, c, d});
-        if (anglemin < -1.0 || anglemax > 1.0){
-            throw oxDNAException("Cos of Angle in Parameter File not in Valid bounds");
-        }
-    };
-
-    char n[5] = "none";
-    if(strcmp(_parameterfile, n) != 0 && strcmp(_parameterfile, "") != 0) {
-        int key1, key2;
-        char potswitch;
-        double potential, dist;
-        double a0, b0, c0, d0;
-        int N;
-        std::fstream parameters;
-        parameters.open(_parameterfile, std::ios::in);
-        parameters >> N;
-        int spring_connection_num = 0;
-        if (parameters.is_open())
-        {
-            while (parameters >> key1 >> key2 >> dist >> potswitch >> potential)
-            {
-                valid_spring_params(N, key1, key2, dist, potswitch, potential);
-                spring_connection_num += 1;
-
-                //If DNACT
-                if(_angular) {
-                    if (key2 - key1 == 1) {
-                        parameters >> a0 >> b0 >> c0 >> d0;
-                        valid_angles(a0, b0, c0, d0);
-                        if (_parameter_kbkt) {
-                            parameters >> _k_bend >> _k_tor;
-                            if (_k_bend < 0 || _k_tor < 0)
-                                throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File");
-                            std::pair<double, double> ang_constants(_k_bend, _k_tor);
-                            _ang_stiff[key1] = ang_constants;
-                        }
-                        std::vector<double> angles{a0, b0, c0, d0};
-                        _ang_vals[key1] = angles;
-                    }
-                }
-                std::pair <int, int> lkeys (key1, key2);
-                std::pair <char, double> pot (potswitch, potential);
-                _rknot[lkeys] = dist;
-                _potential[lkeys] = pot;
-            }
-        }
-        else
-        {
-            throw oxDNAException("ParameterFile Could Not Be Opened");
-        }
-        parameters.close();
-        if (_angular) {
-            if (spring_connection_num == 1 && N > 2 && _parameter_kbkt)
-                throw oxDNAException(
-                        "Invalid Parameter File Format, pairwise kb and kt values incorrectly formatted or missing");
-            if (spring_connection_num == 1 && N > 2 && !_parameter_kbkt)
-                throw oxDNAException(
-                        "Invalid Parameter File Format, global kb and kt values have been set in Inputfile");
-        } else if (spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
-    } else {
-        OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
-    }
+    }else{
+        load_extra_file(_massfile);
+    } // CGDNAInteraction must have a mass file defined
 }
-
 
 void CGDNAInteraction::check_input_sanity(std::vector<BaseParticle*> &particles){
     //this->DNA2Interaction::check_input_sanity(particles,N);
     //Need to make own function that checks the input sanity
 }
 
-
 void CGDNAInteraction::allocate_particles(std::vector<BaseParticle*> &particles) {
-    if (ndna==0 || ndnas==0) {
-        OX_LOG(Logger::LOG_INFO, "No DNA Particles Specified, Continuing with just Protein Particles");
-        if (_angular) for (int i = 0; i < npro; i++) particles[i] = new ANMTParticle();
-        else for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
-
-    } else if (npro == 0) {
-        OX_LOG(Logger::LOG_INFO, "No Protein Particles Specified, Continuing with just DNA Particles");
-        for (int i = 0; i < ndna; i++) particles[i] = new DNANucleotide(this->_grooving);
-
-    } else {
-        if (_firststrand > 0){
-            for (int i = 0; i < ndna; i++) particles[i] = new DNANucleotide(this->_grooving);
-            // Protein
-            if (_angular) for (uint i = ndna; i < particles.size(); i++) particles[i] = new ANMTParticle();
-            else for (uint i = ndna; i < particles.size(); i++) particles[i] = new ANMParticle();
-        } else {
-            // Protein
-            if (_angular) for (int i = 0; i < npro; i++) particles[i] = new ANMTParticle();
-            else for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
-
-            for (uint i = npro; i < particles.size(); i++) particles[i] = new DNANucleotide(this->_grooving);
+    int n = 0;
+    for(auto &t: topology_order) {
+        if (t == 0) {
+            OX_LOG(Logger::LOG_INFO, "CG Particles Initialized");
+            for (int i = n; i < n + ngs; i++) particles[i] = new ANMParticle();
+            n += ngs;
+        } else if (t == 1) {
+            OX_LOG(Logger::LOG_INFO, "Protein Particles Initialized");
+            if (_angular) for (int i = n; i < n + npro; i++) particles[i] = new ANMTParticle();
+            else for (int i = n; i < n + npro; i++) particles[i] = new ANMParticle();
+            n += npro;
+        } else if (t == 2) {
+            OX_LOG(Logger::LOG_INFO, "DNA Particles Initialized");
+            for (int i = n; i < n + ndna; i++) particles[i] = new DNANucleotide(this->_grooving);
+            n += ndna;
         }
+        // ignore -1 topology_order is initialized with
     }
-}
 
+    assert(n == particles.size);
+
+}
 
 void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &particles) {
     int my_N, my_N_strands;
@@ -215,20 +118,51 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
     topology.getline(line, 5120);
     std::stringstream head(line);
 
-    head >> my_N >> my_N_strands >> ndna >> npro >>ndnas >> npep;
+    head >> my_N >> my_N_strands >> ndna >> npro >> ndnas >> npep;
     ngstrands = my_N_strands - ndnas - npep;
     ngs = my_N - ndna - npro;
     if (head.fail()) throw oxDNAException("Problem with header make sure the format is correct for CGDNA Interaction");
-
-
 
     if(my_N_strands < 0 || my_N_strands > my_N || ndna > my_N || ndna < 0 || npro > my_N || npro < 0 || ndnas < 0
             || ndnas > my_N || npep < 0 || npep > my_N || ngstrands < 0 || ngstrands > my_N) {
         throw oxDNAException("Problem with header make sure the format is correct for CGDNA Interaction");
     }
 
+    int strand = 0, i = 0;
+    std::string base_tmp;
+    std::array<bool, 3> found = {false, false, false}; // specific to models [found_dna, found_protein, found_cg]
+    while (topology.good()) {
+        topology.getline(line, 5120);
+        if (strlen(line) == 0 || line[0] == '#')
+            continue;
+//        if (i == my_N)
+//            throw oxDNAException("Too many particles found in the topology file (should be %d), aborting", my_N);
 
-    int strand, i = 0;
+        std::stringstream ss(line);
+        ss >> strand >> base_tmp;
+        // CG DNA flag
+        // negative strand number and contains digits in the base field "gs0"
+        if (strand < 0 && !found[0] && std::any_of(base_tmp.begin(), base_tmp.end(),::isdigit)) {
+            topology_order[std::count(found.begin(), found.end(), true)] = 0;
+            found[0] = true;
+        }
+        // Protein Flag
+        // negative strand number and no digits in the base field -1 T
+        if (strand < 0 && !found[1] && !std::any_of(base_tmp.begin(), base_tmp.end(),::isdigit)) {
+            topology_order[std::count(found.begin(), found.end(), true)] = 1;
+            found[1] = true;
+        }
+        // DNA Flag
+        if (strand > 0 && !found[2]){ // positive strand number DNA 1 A
+            topology_order[std::count(found.begin(), found.end(), true)] = 2;
+            found[2] = true;
+        }
+    }
+
+    topology.seekg(0, std::ifstream::beg); // Unsure of this but CLion likes it
+    topology.getline(line, 5120); // Read the header so we can skip it
+
+    strand = 0, i = 0;
     while (topology.good()) {
         topology.getline(line, 5120);
         if (strlen(line) == 0 || line[0] == '#')
@@ -239,7 +173,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
         std::stringstream ss(line);
         ss >> strand;
         if (i == 0) {
-            _firststrand = strand; //Must be set prior to allocation of particles
+             //Must be set prior to allocation of particles
             allocate_particles(particles);
             for (int j = 0; j < my_N; j++) {
                 particles[j]->index = j;
@@ -248,60 +182,106 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             }
         }
 
-        // Amino Acid
+        // Amino Acid or... Generic Sphere
         if (strand < 0) {
             BaseParticle *p = particles[i];
             char aminoacid[256];
             int nside, cside;
+            int subtype; // used only for GS
             ss >> aminoacid >> nside >> cside;
-
             int x;
             std::set<int> myneighs;
-            if (nside >= 0) {
-                myneighs.insert(nside);
-                if(_angular) p->n3 = particles[nside];
-            }
-            if (cside >= 0) {
-                myneighs.insert(cside);
-                if(_angular) p->n5 = particles[cside];
-            }
-            while (ss.good()) {
-                ss >> x;
-                if (x < 0 || x >= my_N) {
-                    throw oxDNAException("Line %d of the topology file has an invalid syntax, neighbor has invalid id", i + 2);
+            std::string tmp(aminoacid);  // conversion to string
+            if(std::any_of(tmp.begin(), tmp.end(),::isdigit)){
+                //generic sphere topology reading
+                tmp.erase(0, 2); // remove first 2 characters -> 'gs', left with subtype integer
+                subtype=stoi(tmp);
+                if(subtype> gs_subtype_num){
+                    gs_subtype_num = subtype;  // will substract 26 to get number
                 }
-                myneighs.insert(x);
-            }
+                p->type = 2; // used for interaction matrix calls
+                p->btype = subtype;// first 27 (0, 26) dna + protein subtypes
 
-            if (_angular) {
-                auto *q = dynamic_cast< ANMTParticle * > (p);
-                for(auto & k : myneighs){
-                    if (p->index < k) {
-                        q->add_bonded_neighbor(particles[k]);
+                if (nside >= 0) {
+                    myneighs.insert(nside);
+                    if(_angular) p->n3 = particles[nside];
+                }
+                if (cside >= 0) {
+                    myneighs.insert(cside);
+                    if(_angular) p->n5 = particles[cside];
+                }
+
+                while (ss.good()) {
+                    ss >> x;
+                    if (x < 0 || x >= my_N) {
+                        throw oxDNAException("Line %d of the topology file has an invalid syntax, neighbor has invalid id", i + 2);
                     }
+                    myneighs.insert(x);
                 }
 
-            } else {
                 auto *q = dynamic_cast< ANMParticle * > (p);
                 for(auto & k : myneighs){
                     if (p->index < k) {
                         q->add_bonded_neighbor(particles[k]);
                     }
                 }
+
+                p->mass = masses[p->btype];
+                p->massinverted = 1.f/p->mass;
+
+                p->strand_id = abs(strand) + ndnas - 1;
+                p->index = i;
+
+                i++;
+
+            } else {
+
+                if (nside >= 0) {
+                    myneighs.insert(nside);
+                    if(_angular) p->n3 = particles[nside];
+                }
+                if (cside >= 0) {
+                    myneighs.insert(cside);
+                    if(_angular) p->n5 = particles[cside];
+                }
+                while (ss.good()) {
+                    ss >> x;
+                    if (x < 0 || x >= my_N) {
+                        throw oxDNAException("Line %d of the topology file has an invalid syntax, neighbor has invalid id", i + 2);
+                    }
+                    myneighs.insert(x);
+                }
+
+                if (_angular) {
+                    auto *q = dynamic_cast< ANMTParticle * > (p);
+                    for(auto & k : myneighs){
+                        if (p->index < k) {
+                            q->add_bonded_neighbor(particles[k]);
+                        }
+                    }
+
+                } else {
+                    auto *q = dynamic_cast< ANMParticle * > (p);
+                    for(auto & k : myneighs){
+                        if (p->index < k) {
+                            q->add_bonded_neighbor(particles[k]);
+                        }
+                    }
+                }
+
+                if (strlen(aminoacid) == 1) {
+                    p->type = 1;
+                    p->btype = Utils::decode_aa(aminoacid[0]);
+                }
+
+                p->mass = masses[p->btype];
+                p->massinverted = 1.f/p->mass;
+
+                p->strand_id = abs(strand) + ndnas - 1;
+                p->index = i;
+
+                i++;
             }
-
-            if (strlen(aminoacid) == 1) {
-                p->type = Utils::decode_aa(aminoacid[0]);
-                p->btype = Utils::decode_aa(aminoacid[0]);
-            }
-
-            p->mass = masses[p->btype];
-            p->massinverted = 1.f/p->mass;
-
-            p->strand_id = abs(strand) + ndnas - 1;
-            p->index = i;
-
-            i++;
         }
         if (strand > 0) {
             char base[256];
@@ -320,7 +300,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
             // the base can be either a char or an integer
             if (strlen(base) == 1) {
-                p->type = Utils::decode_base(base[0]);
+                p->type = 0;
                 p->btype = Utils::decode_base(base[0]);
 
             } else {
@@ -346,6 +326,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
     }
 
+    gs_subtype_num -= 26;
 
     if (i < my_N)
         throw oxDNAException("Not enough particles found in the topology file (should be %d). Aborting", my_N);
@@ -357,148 +338,154 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
     *N_strands = my_N_strands;
 
-}
+    // topolog y must be read for this
+    int N = gs_subtype_num;
+    int excl_vol_interaction_size = N*N; // triangular matrix
+    _gs_gs_exc_vol_params = new number[excl_vol_interaction_size * 5](); // each excl vol needs 5 params per interaction
+    for(i = 0; i<excl_vol_interaction_size * 5; i++) _gs_gs_exc_vol_params[i] = 0.f;
+    number sigma, rstar, rc, b, sqr_rcut, interaction_dist;
+    int j;
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            if (i > j)
+                continue;
+            interaction_dist = radii[27 + i] + radii[27 + j];
+            printf("interaction dist %.3f \n", interaction_dist);
+            _fill_in_constants(interaction_dist, sigma, rstar, b, rc);
+            printf("sigma %.3f rstar %.3f b %.3f rc %.3f \n", sigma, rstar, b, rc);
+            sqr_rcut = SQR(rc);
+            // i*gs_subtype_num-(i-1)+j
+            _gs_gs_exc_vol_params[5 * (i*N + j)] = sigma;
+            _gs_gs_exc_vol_params[5 * (i*N + j) + 1] = rstar;
+            _gs_gs_exc_vol_params[5 * (i*N + j) + 2] = b;
+            _gs_gs_exc_vol_params[5 * (i*N + j) + 3] = rc;
+            _gs_gs_exc_vol_params[5 * (i*N + j) + 4] = sqr_rcut;
 
+            _gs_gs_exc_vol_params[5 * (j*N + i)] = sigma;
+            _gs_gs_exc_vol_params[5 * (j*N + i) + 1] = rstar;
+            _gs_gs_exc_vol_params[5 * (j*N + i) + 2] = b;
+            _gs_gs_exc_vol_params[5 * (j*N + i) + 3] = rc;
+            _gs_gs_exc_vol_params[5 * (j*N + i) + 4] = sqr_rcut;
+        }
+    }
+
+    int excl_vol_pro_dna_size = N * 3;
+    _gs_other_exc_vol_params = new number[excl_vol_pro_dna_size * 5]();
+    for(i = 0; i<excl_vol_pro_dna_size * 5; i++) _gs_other_exc_vol_params[i] = 0.f;
+    // fill in protein and dna excl volume
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < 3; j++) {
+            if (j == 0) {
+                _fill_in_constants(radii[i+27] + _pro_sigma / 2, sigma, rstar, b, rc); // protein 0
+            } else if (j == 1) {
+                _fill_in_constants(radii[i+27] + _pro_base_sigma - .175f, sigma, rstar, b, rc); // base 1
+            } else if (j == 2) {
+                _fill_in_constants(radii[i+27] + _pro_backbone_sigma - .175f, sigma, rstar, b, rc); // backbone 2
+            } else {
+                throw oxDNAException("Problem filling in Excluded Volume Constants");
+            }
+            sqr_rcut = SQR(rc);
+            _gs_other_exc_vol_params[5 * (3 * i + j)] = sigma;
+            _gs_other_exc_vol_params[5 * (3 * i + j) + 1] = rstar;
+            _gs_other_exc_vol_params[5 * (3 * i + j) + 2] = b;
+            _gs_other_exc_vol_params[5 * (3 * i + j) + 3] = rc;
+            _gs_other_exc_vol_params[5 * (3 * i + j) + 4] = sqr_rcut;
+        }
+    }
+
+
+}
 
 number CGDNAInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
-    if (p->btype < 4 && q->btype < 4){
+    if(p->type == q->type){
         if(p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
+    } else {
+        return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     }
-    if ((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) return this->pair_interaction_nonbonded(p, q, compute_r, update_forces);
-
-    if (p->btype > 4 && q->btype > 4){
-        // ANM & ANMT call same functions here
-        if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
-        else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
-    }
-    return 0.f;
 }
-
 
 number CGDNAInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
     if(compute_r)
         if (q != P_VIRTUAL && p != P_VIRTUAL)
             _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    if (p->btype < 4 && q->btype < 4){ // dna-dna
-        if(!this->_check_bonded_neighbour(&p, &q, compute_r)) return (number) 0;
-        number energy = _backbone(p,q,compute_r,update_forces);
-        energy += _bonded_excluded_volume(p,q,compute_r,update_forces);
-        energy += _stacking(p,q,compute_r,update_forces);
-        return energy;
-    } else if (p->btype > 4 && q->btype > 4){ // protein-protein
-        if(_angular){
-            if (!p->is_bonded(q)) return 0.f;
-            number energy = _protein_spring(p, q, compute_r, update_forces);
-            energy += _protein_exc_volume(p, q, compute_r, update_forces);
-            if (q->index - p->index == 1) energy += _protein_ang_pot(p, q, compute_r, update_forces);
-            return energy;
-        } else {
-            if (!p->is_bonded(q)) return 0.f;
-            number energy = _protein_spring(p, q, compute_r, update_forces);
-            energy += _protein_exc_volume(p, q, compute_r, update_forces);
-            return energy;
-        }
-    } else
-        return 0.f;
-
-    // Expect Topology to not contain Bonds b/t protein & DNA
+    assert(p->type == q->type);
+    return (this->*_interaction_matrix_bonded[p->type])(p, q, compute_r, update_forces);
 }
 
+number CGDNAInteraction::_gs_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
+    // get params first
+    number energy = _protein_spring(p, q, compute_r, update_forces);
+    energy += _gs_exc_volume(p, q, compute_r, update_forces);
+    return energy;
+}
+
+number CGDNAInteraction::_pro_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
+    if(_angular){
+        if (!p->is_bonded(q)) return 0.f;
+        number energy = _protein_spring(p, q, compute_r, update_forces);
+        energy += _protein_exc_volume(p, q, compute_r, update_forces);
+        if (q->index - p->index == 1) energy += _protein_ang_pot(p, q, compute_r, update_forces);
+        return energy;
+    } else {
+        if (!p->is_bonded(q)) return 0.f;
+        number energy = _protein_spring(p, q, compute_r, update_forces);
+        energy += _protein_exc_volume(p, q, compute_r, update_forces);
+        return energy;
+    }
+}
+
+number CGDNAInteraction::_dna_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
+    if(!this->_check_bonded_neighbour(&p, &q, compute_r)) return (number) 0;
+    number energy = _backbone(p,q,compute_r,update_forces);
+    energy += _bonded_excluded_volume(p,q,compute_r,update_forces);
+    energy += _stacking(p,q,compute_r,update_forces);
+    return energy;
+}
 
 number CGDNAInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
     if (compute_r)
         _computed_r = this->_box->min_image(p->pos, q->pos);
 
     number rnorm = _computed_r.norm();
-    if (p->btype < 4 && q->btype < 4) { //DNA-DNA Interaction
-        if (rnorm >= _sqr_rcut) return (number) 0.f;
-        number energy = _nonbonded_excluded_volume(p, q, compute_r, update_forces);
-        energy += _hydrogen_bonding(p, q, compute_r, update_forces);
-        energy += _cross_stacking(p, q, compute_r, update_forces);
-        energy += _coaxial_stacking(p, q, compute_r, update_forces);
-        energy += _debye_huckel(p, q, compute_r, update_forces);
-        return energy;
-    } else if (p->btype > 4 && q->btype > 4) { // protein-protein
-        if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
-        number energy = _protein_exc_volume(p, q, compute_r, update_forces);
-        return energy;
-    }else if((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) { //protein-dna
-        if (rnorm >= _pro_dna_sqr_rcut) return (number) 0.f;
-        number energy = _protein_dna_exc_volume(p, q, compute_r, update_forces);
-        return energy;
-    }
-
-    return 0.f;
+    return (this->*_interaction_matrix_nonbonded[3*p->type + q->type])(p, q, compute_r, update_forces, rnorm);
 }
 
-
-number CGDNAInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)
-{
-    BaseParticle *protein;
-    BaseParticle *nuc;
-
-    LR_vector force(0, 0, 0);
-    LR_vector rcenter = _computed_r;
-
-    if(p->btype < 4 && q->btype > 4)
-    {
-        //rcenter = -rcenter;
-        protein = q;
-        nuc = p;
-    }
-    else if (p->btype > 4 && q->btype < 4)
-    {
-        rcenter = -rcenter;
-        protein = p;
-        nuc = q;
-    }
-    else
-        return 0.f;
-
-    LR_vector r_to_back = rcenter  - nuc->int_centers[DNANucleotide::BACK];
-    LR_vector r_to_base = rcenter  - nuc->int_centers[DNANucleotide::BASE];
-
-    LR_vector torquenuc(0,0,0);
-    auto energy = (number) 0.f;
-
-
-    if(r_to_back.norm() < _pro_backbone_sqr_rcut) {
-        energy = _protein_dna_repulsive_lj(r_to_back, force, update_forces, _pro_backbone_sigma, _pro_backbone_b, _pro_backbone_rstar,_pro_backbone_rcut,_pro_backbone_stiffness);
-        //printf("back-pro %d %d %f\n",p->index,q->index,energy);
-        if (update_forces) {
-            torquenuc = nuc->int_centers[DNANucleotide::BACK].cross(-force);
-            nuc->torque += nuc->orientationT * torquenuc;
-            nuc->force -= force;
-            protein->force += force;
-            if(_angular){
-                r_to_back.normalize();
-                protein->torque += p->orientationT*(-r_to_back*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
-            }
-        }
-    }
-
-    if(r_to_base.norm() < _pro_base_sqr_rcut){
-        printf("pro %d dna %d\n", protein->index, nuc->index);
-        energy += _protein_dna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
-        if(update_forces) {
-            torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(-force);
-            nuc->torque += nuc->orientationT * torquenuc;
-            nuc->force -= force;
-            protein->force += force;
-            if(_angular){
-                r_to_base.normalize();
-                protein->torque += p->orientationT*(-r_to_base*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
-            }
-        }
-    }
-
+number CGDNAInteraction::_dna_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+    if (rnorm >= _sqr_rcut) return (number) 0.f;
+    number energy = _nonbonded_excluded_volume(p, q, compute_r, update_forces);
+    energy += _hydrogen_bonding(p, q, compute_r, update_forces);
+    energy += _cross_stacking(p, q, compute_r, update_forces);
+    energy += _coaxial_stacking(p, q, compute_r, update_forces);
+    energy += _debye_huckel(p, q, compute_r, update_forces);
     return energy;
 }
 
+number CGDNAInteraction::_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+    if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
+    else return _protein_exc_volume(p, q, compute_r, update_forces);
+}
 
-number CGDNAInteraction::_protein_dna_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness) {
+number CGDNAInteraction::_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+    return _gs_exc_volume(p, q, compute_r, update_forces);
+}
+
+number CGDNAInteraction::_dna_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+    if (rnorm >= _pro_dna_sqr_rcut) return (number) 0.f;
+    number energy = _protein_dna_exc_volume(p, q, compute_r, update_forces);
+    return energy;
+}
+
+number CGDNAInteraction::_dna_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+    return _gs_dna_exc_volume(p, q, compute_r, update_forces);
+}
+
+number CGDNAInteraction::_pro_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+    return _gs_pro_exc_volume(p, q, compute_r, update_forces, rnorm);
+}
+
+number CGDNAInteraction::_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness) {
     // this is a bit faster than calling r.norm()
     number rnorm = SQR(r.x) + SQR(r.y) + SQR(r.z);
     number energy = (number) 0;
@@ -523,170 +510,125 @@ number CGDNAInteraction::_protein_dna_repulsive_lj(const LR_vector &r, LR_vector
     return energy;
 }
 
+number CGDNAInteraction::_gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
+    BaseParticle *gs;
+    BaseParticle *nuc;
 
-void CGDNAInteraction::init() {
-    DNA2Interaction::init();
-    ndna=0, npro=0, ndnas =0;
-    //let's try this
-    _pro_backbone_sigma = 0.57f;
-    _pro_backbone_rstar= 0.569f;
-    _pro_backbone_b = 178699253.5f;
-    _pro_backbone_rcut = 0.572934f;
-    _pro_backbone_stiffness = 1.0f;
-    _pro_backbone_sqr_rcut = 0.3283f;
-    //Base-Protein Excluded Volume Parameters
-    _pro_base_sigma = 0.36f;
-    _pro_base_rstar= 0.359f;
-    _pro_base_b = 296866090.f;
-    _pro_base_rcut = 0.362897f;
-    _pro_base_stiffness = 1.0f;
-    _pro_base_sqr_rcut = 0.1317f;
-    //Protein-Protein Excluded Volume Parameters
-    _pro_sigma = 0.35f;
-    _pro_rstar = 0.349f;
-    _pro_b = 306484596.421f;
-    _pro_rcut = 0.352894;
-    _pro_sqr_rcut = 0.12454f; //_rc ^2
+    LR_vector force(0, 0, 0);
+    LR_vector rcenter = _computed_r;
 
-    _pro_dna_sqr_rcut = 3.0625f; //placeholder test value 1.75^2
-}
+    if(p->type == 0)
+    {
+        //rcenter = -rcenter;
+        gs = q;
+        nuc = p;
+    }
+    else if (q->type == 0)
+    {
+        rcenter = -rcenter;
+        gs = p;
+        nuc = q;
+    }
+    else
+        return 0.f;
 
-//Functions almost Identical to those in ANMInteraction
-number CGDNAInteraction::_protein_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces) {
-    // this is a bit faster than calling r.norm()
-    //changed to a quartic form
-    number rnorm = SQR(r.x) + SQR(r.y) + SQR(r.z);
-    number energy = (number) 0;
-    if(rnorm < SQR(_pro_rcut)) {
-        if(rnorm > SQR(_pro_rstar)) {
-            number rmod = sqrt(rnorm);
-            number rrc = rmod - _pro_rcut;
-            energy = EXCL_EPS * _pro_b * SQR(SQR(rrc));
-            if(update_forces) force = -r * (4 * EXCL_EPS * _pro_b * CUB(rrc)/ rmod);
-        }
-        else {
-            number tmp = SQR(_pro_sigma) / rnorm;
-            number lj_part = tmp * tmp * tmp;
-            energy = 4 * EXCL_EPS * (SQR(lj_part) - lj_part);
-            if(update_forces) force = -r* (24 * EXCL_EPS * (lj_part - 2*SQR(lj_part))/rnorm);
+    LR_vector r_to_back = rcenter  - nuc->int_centers[DNANucleotide::BACK];
+    LR_vector r_to_base = rcenter  - nuc->int_centers[DNANucleotide::BASE];
+
+    LR_vector torquenuc(0,0,0);
+    auto energy = (number) 0.f;
+
+    int i = gs->btype - 26;
+
+    // backbone parameters
+    number sigma, rstar, b, rc;
+    number sqr_rcut = _gs_other_exc_vol_params[5 * (3*i + 2) + 4];
+    if( r_to_back.norm() < sqr_rcut){
+        sigma = _gs_other_exc_vol_params[5 * (3*i + 2)];
+        rstar = _gs_other_exc_vol_params[5 * (3*i + 2) + 1];
+        b = _gs_other_exc_vol_params[5 * (3*i + 2) + 2];
+        rc = _gs_other_exc_vol_params[5 * (3*i + 2) + 3];
+        energy += _repulsive_lj(r_to_back, force, update_forces, sigma, b, rstar,rc,_gs_exc_vol_stiffness);
+        if (update_forces) {
+            torquenuc = nuc->int_centers[DNANucleotide::BACK].cross(-force);
+            nuc->torque += nuc->orientationT * torquenuc;
+            nuc->force -= force;
+            gs->force += force;
         }
     }
 
-    if(update_forces && energy == (number) 0) force.x = force.y = force.z = (number) 0;
+    sqr_rcut = _gs_other_exc_vol_params[5 * (3*i + 1) + 4];
+    if( r_to_base.norm() < sqr_rcut) {
+        sigma = _gs_other_exc_vol_params[5 * (3 * i + 1)];
+        rstar = _gs_other_exc_vol_params[5 * (3 * i + 1) + 1];
+        b = _gs_other_exc_vol_params[5 * (3 * i + 1) + 2];
+        rc = _gs_other_exc_vol_params[5 * (3 * i + 1) + 3];
+        energy += _repulsive_lj(r_to_base, force, update_forces, sigma, b, rstar, rc, _gs_exc_vol_stiffness);
+        if(update_forces) {
+            torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(-force);
+            nuc->torque += nuc->orientationT * torquenuc;
+            nuc->force -= force;
+            gs->force += force;
+        }
+    }
 
     return energy;
 }
 
+number CGDNAInteraction::_gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm) {
+    int i;
+    p->type < q-> type ? i=p->btype: i=q->btype; // highest type number is gs, assign to i
+    i -= 26;
 
-number CGDNAInteraction::_protein_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
-    LR_vector force(0,0,0);
-    number energy =  _protein_repulsive_lj(_computed_r, force, update_forces);
+    number sqr_rcut = _gs_other_exc_vol_params[5 * (3*i + 0) + 4];
+    if( sqr_rcut > rnorm) return 0.f;
 
+    number sigma = _gs_other_exc_vol_params[5 * (3*i + 0)];
+    number rstar = _gs_other_exc_vol_params[5 * (3*i + 0) + 1];
+    number b = _gs_other_exc_vol_params[5 * (3*i + 0) + 2];
+    number rc = _gs_other_exc_vol_params[5 * (3*i + 0) + 3];
+
+    LR_vector force(0, 0, 0);
+    number energy = _repulsive_lj(_computed_r, force, update_forces, sigma, b, rstar, rc, _gs_exc_vol_stiffness);
     if(update_forces)
     {
         p->force -= force;
         q->force += force;
-        if(_angular){
-            p->torque += p->orientationT*(_computed_r*0.5).cross(-force);
-            q->torque += q->orientationT*(-_computed_r*0.5).cross(force);
-        }
     }
-
     return energy;
 }
 
+number CGDNAInteraction::_gs_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
+    int i = p->btype - 27;
+    int j = q->btype - 27;
+    int &N = gs_subtype_num;
 
-number CGDNAInteraction::_protein_spring(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
+    number sqr_rcut = _gs_gs_exc_vol_params[5 * (i*N+ j)+4];
+    if( sqr_rcut > _computed_r.norm()) return 0.f;
 
-    std::pair <int,int> keys (std::min(p->index, q->index), std::max(p->index, q->index));
+    number sigma = _gs_gs_exc_vol_params[5 * (i*N+ j)];
+    number rstar = _gs_gs_exc_vol_params[5 * (i*N+ j)+1];
+    number b = _gs_gs_exc_vol_params[5 * (i*N+ j)+2];
+    number rc = _gs_gs_exc_vol_params[5 * (i*N+ j)+3];
 
-    //Harmonic Spring Potential
-    number _k = _potential[keys].second; //stiffness of the spring
-
-    number rinsta = _computed_r.module(); // distance b/t p and q
-    number disp = rinsta - _rknot[keys]; // current distance - eqdistance
-    number energy = 0.5 * _k * SQR(disp);
-
-    if (update_forces) {
-        LR_vector force(_computed_r);
-        force *= (-1.0f * _k ) * disp/rinsta;
-
+    LR_vector force(0, 0, 0);
+    number energy = _repulsive_lj(_computed_r, force, update_forces, sigma, b, rstar, rc, _gs_exc_vol_stiffness);
+    if(update_forces)
+    {
         p->force -= force;
         q->force += force;
     }
-
     return energy;
 }
 
-
-number CGDNAInteraction::_protein_ang_pot(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
-    // Get Angular Parameters
-    std::vector<double> &ang_params = _ang_vals[p->index];
-    double &a0 = ang_params[0];
-    double &b0 = ang_params[1];
-    double &c0 = ang_params[2];
-    double &d0 = ang_params[3];
-
-    if (_parameter_kbkt) { //Uses array with per particle kb and kt
-        _k_bend = this->_ang_stiff[p->index].first;
-        _k_tor = this->_ang_stiff[p->index].second;
-    } // If False, the global kb and kt will be used
-
-
-    LR_vector rij_unit = _computed_r;
-    rij_unit.normalize();
-    LR_vector rji_unit = rij_unit * -1.f;
-
-    LR_vector &a1 = p->orientationT.v1;
-    LR_vector &b1 = q->orientationT.v1;
-    LR_vector &a3 = p->orientationT.v3;
-    LR_vector &b3 = q->orientationT.v3;
-
-
-    double o1 = rij_unit * a1 - a0;
-    double o2 = rji_unit * b1 - b0;
-    double o3 = a1 * b1 - c0;
-    double o4 = a3 * b3 - d0;
-
-    //Torsion and Bending
-    number energy = _k_bend * 0.5f * (SQR(o1) + SQR(o2)) + _k_tor * 0.5f * (SQR(o3) + SQR(o4));
-
-    if (update_forces) {
-
-        LR_vector force = -(rji_unit.cross(rij_unit.cross(a1)) * _k_bend * o1 -
-                                    rji_unit.cross(rij_unit.cross(b1)) * _k_bend * o2) / _computed_r.module();
-
-        p->force -= force;
-        q->force += force;
-
-        LR_vector ta = rij_unit.cross(a1) * o1 * _k_bend;
-        LR_vector tb = rji_unit.cross(b1) * o2 * _k_bend;
-
-        p->torque += p->orientationT * ta;
-        q->torque += q->orientationT * tb;
-
-        LR_vector torsion = a1.cross(b1) * o3 * _k_tor + a3.cross(b3) * o4 * _k_tor;
-
-        p->torque += p->orientationT * -torsion;
-        q->torque += q->orientationT * torsion;
-
-        //For Debugging, very helpful for CUDA comparisons
-        /*LR_vector<number> TA = p->orientationT * (ta - torsion);
-        LR_vector<number> TB = q->orientationT * (tb + torsion);
-
-        if (p->index ==104){
-            printf("p2 Angular F %.7f %.7f %.7f TA %.7f %.7f %.7f\n", -force.x, -force.y, -force.z, TA.x, TA.y, TA.z);
-        } else if (q->index ==104){
-            printf("q2 Angular F %.7f %.7f %.7f TB %.7f %.7f %.7f\n", force.x, force.y, force.z, TB.x, TB.y, TB.z);
-        }*/
-
-    }
-
-    return energy;
+void CGDNAInteraction::init() {
+    DNANMInteraction::init();
+    ngs = 0, ngstrands = 0, npep = 0;
+    // N(N+1)/2 possible pair interactions for N subtypes of gs particles
+    int N = gs_subtype_num;
 }
 
-
-void CGDNAInteraction::load_massfile(std::string &filename) {
+void CGDNAInteraction::load_extra_file(std::string &filename) {
     std::fstream mass_stream;
     int masstypes;
     mass_stream.open(filename, std::ios::in);
@@ -704,8 +646,10 @@ void CGDNAInteraction::load_massfile(std::string &filename) {
         throw oxDNAException("Could Not Load Mass File, Aborting");
 }
 
-
 CGDNAInteraction::~CGDNAInteraction() {
+    // clean up our pointers with allocated memory
+    delete[] _gs_gs_exc_vol_params;
+    delete[] _gs_other_exc_vol_params;
 }
 
 

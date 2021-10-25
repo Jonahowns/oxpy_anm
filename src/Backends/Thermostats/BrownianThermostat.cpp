@@ -58,9 +58,9 @@ void BrownianThermostat::apply (std::vector<BaseParticle *> &particles, llint cu
 	if (!(curr_step % _newtonian_steps) == 0) return;
 
 	for(auto p: particles) {
-	    number pmass = p->mass;
+	    number pmassI = p->massinverted;
 		if(drand48() < _pt) {
-			p->vel = LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor/sqrt(pmass);
+			p->vel = LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor*sqrt(pmassI);
 		}
 		if(drand48() < _pr) {
 			p->L = LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor; // ToDO *eventually* add inertia

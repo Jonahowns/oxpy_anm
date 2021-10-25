@@ -42,7 +42,7 @@ protected:
 	c_number4 *_d_Ls, *_h_Ls;
 	c_number4 *_d_forces, *_h_forces;
 	c_number4 *_d_torques, *_h_torques;
-	c_number *_d_mass, *_h_mass, *_massvalues; //required for different masses
+	c_number *_d_massInv, *_h_massInv, *_massvalues; //required for different masses
 	// massvalues maps btype to mass value
 	// _h and _d _mass hold elementwise massvalues
 

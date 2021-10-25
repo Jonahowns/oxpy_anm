@@ -75,7 +75,6 @@ public:
 
 	virtual void get_settings(input_file &inp);
 	virtual void init_cuda();
-	void load_massfile(std::string &filename);
 };
 
 #endif /* CUDABASEBACKEND_H_ */

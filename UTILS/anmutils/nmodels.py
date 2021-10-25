@@ -8,6 +8,7 @@ import math
 import sys
 import os
 import json
+from numba import jit
 
 import copy
 
@@ -26,7 +27,7 @@ import copy
 # Ubuntu Example
 # ex. PATH=/usr/local/cuda/bin
 # ex. LD_LIBRARY_PATH=/usr/local/cuda/lib64
-cuda_support = False # Enable CUDA operations by loading CUDA drivers and initializing GPU
+cuda_support = True # Enable CUDA operations by loading CUDA drivers and initializing GPU
 
 if cuda_support:
     from pycuda import autoinit
@@ -331,6 +332,91 @@ def spherical_dtheta(theta, phi):
 def spherical_dphi(theta, phi):
     return np.asarray([-1. * math.sin(theta) * math.sin(phi), math.cos(phi) * math.sin(theta), 0.])
 
+@jit(nopython=True)
+def calc_hess_fast_unitary_jit(cc, distance_matrix, masses, gamma=1.):
+    threeN = 3 * cc
+    hess = np.zeros((threeN, threeN), dtype=np.float32)
+    for i in range(cc):
+        for j in range(cc):
+            if i >= j:
+                continue
+            di = distance_matrix[i, 4 * j:4 * j + 4]
+            # Filter so that Hessian is only created for those bonds in bonds array
+            if di[0] != 0:
+                di2 = np.square(di)
+                g = gamma
+
+                diag = g * di2[1:4] / di2[0]
+
+                xy = g * (di[1] * di[2]) / di2[0]
+                xz = g * (di[1] * di[3]) / di2[0]
+                yz = g * (di[2] * di[3]) / di2[0]
+
+                full = np.zeros((3,3))
+                full[0] = [diag[0], xy, xz]
+                full[1] = [xy, diag[1], yz]
+                full[2] = [xz, yz, diag[2]]
+
+                # full = np.asarray([[diag[0], xy, xz], [xy, diag[1], yz], [xz, yz, diag[2]]], order='F')
+
+                #get masses
+                mi = masses[i]
+                mj = masses[j]
+                mij = math.sqrt(mi*mj)
+
+                # Hii and Hjj
+                hess[3 * i:3 * i + 3, 3 * i:3 * i + 3] += full/mi
+                hess[3 * j: 3 * j + 3, 3 * j:3 * j + 3] += full/mj
+
+                # Hij and Hji
+                hess[3 * i: 3 * i + 3, 3 * j: 3 * j + 3] -= full/mij
+                hess[3 * j: 3 * j + 3, 3 * i: 3 * i + 3] -= full/mij
+    return hess
+
+@jit(nopython=True)
+def calc_hess_fast_sc_jit(cc, distance_matrix, masses, spring_constant_matrix, gamma=1.):
+    threeN = 3 * cc
+    hess = np.zeros((threeN, threeN), dtype=np.float32)
+    for i in range(cc):
+        for j in range(cc):
+            if i >= j:
+                continue
+            di = distance_matrix[i, 4 * j:4 * j + 4]
+            # Filter so that Hessian is only created for those bonds in bonds array
+            if di[0] != 0:
+                di2 = np.square(di)
+                g = spring_constant_matrix[i, j]
+
+                diag = g * di2[1:4] / di2[0]
+
+                xy = g * (di[1] * di[2]) / di2[0]
+                xz = g * (di[1] * di[3]) / di2[0]
+                yz = g * (di[2] * di[3]) / di2[0]
+
+                full = np.zeros((3, 3))
+                full[0] = [diag[0], xy, xz]
+                full[1] = [xy, diag[1], yz]
+                full[2] = [xz, yz, diag[2]]
+
+                # full = np.asarray([[diag[0], xy, xz], [xy, diag[1], yz], [xz, yz, diag[2]]], order='F')
+
+                #get masses
+                mi = masses[i]
+                mj = masses[j]
+                mij = math.sqrt(mi*mj)
+
+                # Hii and Hjj
+                hess[3 * i:3 * i + 3, 3 * i:3 * i + 3] += full/mi
+                hess[3 * j: 3 * j + 3, 3 * j:3 * j + 3] += full/mj
+
+                # Hij and Hji
+                hess[3 * i: 3 * i + 3, 3 * j: 3 * j + 3] -= full/mij
+                hess[3 * j: 3 * j + 3, 3 * i: 3 * i + 3] -= full/mij
+    return hess
+
+
+
+
 
 class ANM(object):
 
@@ -394,73 +480,11 @@ class ANM(object):
         self.distance_matrix = d_matrix
 
     def calc_hess_fast_sc(self, spring_constant_matrix):
-        threeN = 3 * self.cc
-        hess = np.zeros((threeN, threeN), dtype=np.float32)
-        for i in range(self.cc):
-            for j in range(self.cc):
-                if i >= j:
-                    continue
-                di = self.distance_matrix[i, 4 * j:4 * j + 4]
-                # Filter so that Hessian is only created for those bonds in bonds array
-                if di[0] != 0:
-                    di2 = np.square(di)
-                    g = spring_constant_matrix[i, j]
-
-                    diag = g * di2[1:4] / di2[0]
-
-                    xy = g * (di[1] * di[2]) / di2[0]
-                    xz = g * (di[1] * di[3]) / di2[0]
-                    yz = g * (di[2] * di[3]) / di2[0]
-
-                    full = np.asarray([[diag[0], xy, xz], [xy, diag[1], yz], [xz, yz, diag[2]]], order='F')
-
-                    #get masses
-                    mi = self.masses[i]
-                    mj = self.masses[j]
-                    mij = math.sqrt(mi*mj)
-
-                    # Hii and Hjj
-                    hess[3 * i:3 * i + 3, 3 * i:3 * i + 3] += full/mi
-                    hess[3 * j: 3 * j + 3, 3 * j:3 * j + 3] += full/mj
-
-                    # Hij and Hji
-                    hess[3 * i: 3 * i + 3, 3 * j: 3 * j + 3] -= full/mij
-                    hess[3 * j: 3 * j + 3, 3 * i: 3 * i + 3] -= full/mij
+        hess = calc_hess_fast_sc_jit(self.cc, self.distance_matrix, self.masses, spring_constant_matrix)
         return hess
 
     def calc_hess_fast_unitary(self, gamma=1.):
-        threeN = 3 * self.cc
-        hess = np.zeros((threeN, threeN), dtype=np.float32)
-        for i in range(self.cc):
-            for j in range(self.cc):
-                if i >= j:
-                    continue
-                di = self.distance_matrix[i, 4 * j:4 * j + 4]
-                # Filter so that Hessian is only created for those bonds in bonds array
-                if di[0] != 0:
-                    di2 = np.square(di)
-                    g = gamma
-
-                    diag = g * di2[1:4] / di2[0]
-
-                    xy = g * (di[1] * di[2]) / di2[0]
-                    xz = g * (di[1] * di[3]) / di2[0]
-                    yz = g * (di[2] * di[3]) / di2[0]
-
-                    full = np.asarray([[diag[0], xy, xz], [xy, diag[1], yz], [xz, yz, diag[2]]], order='F')
-
-                    #get masses
-                    mi = self.masses[i]
-                    mj = self.masses[j]
-                    mij = math.sqrt(mi*mj)
-
-                    # Hii and Hjj
-                    hess[3 * i:3 * i + 3, 3 * i:3 * i + 3] += full/mi
-                    hess[3 * j: 3 * j + 3, 3 * j:3 * j + 3] += full/mj
-
-                    # Hij and Hji
-                    hess[3 * i: 3 * i + 3, 3 * j: 3 * j + 3] -= full/mij
-                    hess[3 * j: 3 * j + 3, 3 * i: 3 * i + 3] -= full/mij
+        hess = calc_hess_fast_unitary_jit(self.cc, self.distance_matrix, self.masses, gamma=gamma)
         return hess
 
     def calc_inv_Hess(self, hess, cuda=False):
@@ -1117,10 +1141,11 @@ class ANMT(ANM):
 
 # Known Issues: Will not converge if under-constrained residues present, will have to raise cutoff value
 class HANM(ANM):
-    def __init__(self, coord, exp_bfactors, cutoff=15, T=300, scale_factor=0.3, mcycles=5, ncycles=7, masses=[]):
+    def __init__(self, coord, exp_bfactors, cutoff=15, T=300, scale_factor=0.3, mcycles=5, ncycles=7, masses=[], initval=1):
         super().__init__(coord, exp_bfactors, T=T, cutoff=cutoff, masses=masses)
-        self.spring_constant_matrix = np.full((self.cc, self.cc), 1.)
-        self.calc_ANM_unitary(cuda=False, outliers=False)
+        self.spring_constant_matrix = np.full((self.cc, self.cc), initval)
+        self.calc_ANM_unitary(cuda=False, outliers=True, max_devs=1.5, bmax=10000)
+        print(self.ana_gamma)
         self.spring_constant_matrix = np.full((self.cc, self.cc), self.ana_gamma)
 
         self.restraint_force_constants = []
@@ -1132,6 +1157,20 @@ class HANM(ANM):
         self.ncycles = ncycles
         self.routine_finished = False
         self.model_id = 'HANM'
+
+    def preview(self, initval):
+        self.spring_constant_matrix = np.full((self.cc, self.cc), initval)
+        self.calc_dist_matrix()
+        hess = self.calc_hess_fast_unitary()
+        iH = self.calc_inv_Hess(hess, cuda=cuda)
+        self.calc_msds(iH)
+        self.ana_bfactors = [self.bconv * x for x in self.msds]
+
+        self.routine_finished = True
+        self.anm_compare_bfactors_jupyter(view_outliers=True)
+        self.routine_finished = False
+        self.ana_bfactors = []
+
 
     def hanm_calc_restraint_force_constant(self, bcal):
         restraint_force_constants = []
@@ -1147,6 +1186,7 @@ class HANM(ANM):
             hess[3 * i, 3 * i] += restraint_force_constants[i]
             hess[3 * i + 1, 3 * i + 1] += restraint_force_constants[i]
             hess[3 * i + 2, 3 * i + 2] += restraint_force_constants[i]
+
 
     def hanm_calc_bond_fluctuations(self, hess, cuda=False):
         if cuda:
@@ -1166,7 +1206,6 @@ class HANM(ANM):
         else:
             evecs = np.asarray(evecs[:, idx])
 
-        
         #Debugging
         # fig = plt.figure()
         # plt.imshow(evecs)
@@ -1174,12 +1213,9 @@ class HANM(ANM):
 
         # print('eVALS:', evals[6], evals[7])
         # print('evecs:', evecs[0, 6], evecs[0, 7], evecs[1, 6], evecs[1, 7])
-
         # Needed for variable masses
-        for i in range(3*self.cc):
-            evecs[i, 6:] /= math.sqrt(self.masses[math.floor(i/3)]) # weight back eigen vectors
-
-
+        for i in range(3 * self.cc):
+            evecs[i, 6:] /= math.sqrt(self.masses[math.floor(i / 3)])  # weight back eigen vectors
 
         bcal = [0. for x in range(self.cc)]
         bond_fluc = np.full((self.cc, self.cc), 0.)
@@ -1198,6 +1234,7 @@ class HANM(ANM):
                         p = tmp / dis * (evecs[3 * i:3 * i + 3, k] - evecs[3 * j:3 * j + 3, k])
                         if evals[k] != 0.:
                             bond_fluc[i, j] += np.sum(p) ** 2. / evals[k]
+
         return bcal, bond_fluc
 
     def hanm_nma(self, fc, fc_res, cuda=False):
@@ -1261,7 +1298,11 @@ class HANM(ANM):
                                 ncheck = 0.
 
                             # update Spring Constant Matrix
-                            sc_mat_tmp[x, y] = 1. / ((1. / sc_mat_tmp[x, y]) - alpha * delta_fluc)
+                            sc_tmp = 1. / ((1. / sc_mat_tmp[x, y]) - alpha * delta_fluc)
+                            if sc_tmp < 0:
+                                print("Negative Spring Constant, connection X:", x, "and Y:", y)
+                                return
+                            sc_mat_tmp[x, y] = sc_tmp
                             sc_mat_tmp[y, x] = sc_mat_tmp[x, y]
 
                 if ncheck:
@@ -1272,6 +1313,11 @@ class HANM(ANM):
                     break
                 else:
                     print("Force Constants have not converged after %d mcycles and %d ncycles" % (i, j))
+                    self.ana_bfactors = bcal
+                    self.spring_constant_matrix = sc_mat_tmp
+                    self.routine_finished = True
+                    self.hanm_theor_bfactors_jupyter()
+                    self.routine_finished = False
         self.ana_bfactors = bcal
         self.spring_constant_matrix = sc_mat_tmp
         self.routine_finished = True

@@ -23,11 +23,11 @@ __device__ GPU_quat _get_updated_orientation(c_number4 &L, GPU_quat &old_o) {
 	return quat_multiply(old_o, R);
 }
 
-__global__ void first_step(c_number *masses, c_number4 *poss, GPU_quat *orientations, c_number4 *list_poss, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques, bool *are_lists_old) {
+__global__ void first_step(c_number *massesInv, c_number4 *poss, GPU_quat *orientations, c_number4 *list_poss, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques, bool *are_lists_old) {
 	if(IND >= MD_N[0]) return;
 
 	const c_number4 F = forces[IND];
-	const c_number scale_factor = MD_dt[0] * (c_number) 0.5f / masses[IND]; //Store as inverse masses
+	const c_number scale_factor = MD_dt[0] * (c_number) 0.5f * massesInv[IND]; //Store as inverse masses
 
 	c_number4 r = poss[IND];
 	c_number4 v = vels[IND];
@@ -143,6 +143,24 @@ __global__ void set_external_forces(c_number4 *poss, GPU_quat *orientations, CUD
 				F.z += force.z;
 				break;
 			}
+            case CUDA_TRAP_SKEW: {
+                c_number4 qpos = poss[extF.skew.p_ind];
+
+                c_number4 dr = (extF.skew.PBC) ? box->minimum_image(ppos, qpos) : qpos - ppos;
+                c_number dr_abs = _module(dr);
+
+                c_number dx = (dr_abs - (extF.skew.r0 + extF.skew.rate * step));
+
+                c_number mag = dx*extF.skew.val1 + ((extF.skew.a*exp(pow(dx, 2) * pow(extF.skew.a, 2) * -0.5f) *
+                        extF.skew.val2) / (1 + erf(extF.skew.a*dx*0.7071067811865475)));
+
+                c_number4 force = dr / dr_abs * mag;
+
+                F.x += force.x;
+                F.y += force.y;
+                F.z += force.z;
+                break;
+            }
 			case CUDA_TRAP_MOVING: {
 				c_number tx = extF.moving.pos0.x + extF.moving.rate * step * extF.moving.dir.x;
 				c_number ty = extF.moving.pos0.y + extF.moving.rate * step * extF.moving.dir.y;
@@ -329,13 +347,13 @@ __global__ void set_external_forces(c_number4 *poss, GPU_quat *orientations, CUD
 	torques[IND] = T;
 }
 
-__global__ void second_step(c_number *masses, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques) {
+__global__ void second_step(c_number *massesInv, c_number4 *vels, c_number4 *Ls, c_number4 *forces, c_number4 *torques) {
 	if(IND >= MD_N[0]) return;
 
 	c_number4 F = forces[IND];
 	c_number4 v = vels[IND];
 
-    const c_number scale_factor = MD_dt[0] * (c_number) 0.5f / masses[IND];
+    const c_number scale_factor = MD_dt[0] * (c_number) 0.5f * massesInv[IND];
 
 	v.x += F.x * scale_factor;
 	v.y += F.y * scale_factor;
