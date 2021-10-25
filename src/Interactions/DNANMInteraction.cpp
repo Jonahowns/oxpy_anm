@@ -18,27 +18,27 @@
 
 
 DNANMInteraction::DNANMInteraction(bool btp) : DNA2Interaction() {
-    // TODO: Re-examine These
 
     _angular = btp;
     //Protein Methods Function Pointers
-    _int_map[SPRING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_spring;
-    _int_map[PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_exc_volume;
+    ADD_INTERACTION_TO_MAP(SPRING, _protein_spring);
+    ADD_INTERACTION_TO_MAP(PRO_EXC_VOL, _protein_exc_volume);
+    if(_angular)
+        ADD_INTERACTION_TO_MAP(PRO_ANG_POT, _protein_ang_pot);
 
     //Protein-DNA Function Pointers
-    _int_map[PRO_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_dna_exc_volume;
+    ADD_INTERACTION_TO_MAP(PRO_DNA_EXC_VOL, _protein_dna_exc_volume);
 
-    if(_angular) _int_map[PRO_ANG_POT] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_protein_ang_pot;
 
     //DNA Methods Function Pointers
-    _int_map[BACKBONE] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &DNANMInteraction::_backbone;
-    _int_map[COAXIAL_STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_coaxial_stacking;
-    _int_map[CROSS_STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_cross_stacking;
-    _int_map[BONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_bonded_excluded_volume;
-    _int_map[STACKING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_stacking;
-    _int_map[HYDROGEN_BONDING] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_hydrogen_bonding;
-    _int_map[NONBONDED_EXCLUDED_VOLUME] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_nonbonded_excluded_volume;
-    _int_map[DEBYE_HUCKEL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &DNANMInteraction::_debye_huckel;
+    ADD_INTERACTION_TO_MAP(BACKBONE, _backbone);
+    ADD_INTERACTION_TO_MAP(COAXIAL_STACKING, _coaxial_stacking);
+    ADD_INTERACTION_TO_MAP(CROSS_STACKING, _cross_stacking);
+    ADD_INTERACTION_TO_MAP(BONDED_EXCLUDED_VOLUME, _bonded_excluded_volume);
+    ADD_INTERACTION_TO_MAP(STACKING, _stacking);
+    ADD_INTERACTION_TO_MAP(HYDROGEN_BONDING, _hydrogen_bonding);
+    ADD_INTERACTION_TO_MAP(NONBONDED_EXCLUDED_VOLUME, _nonbonded_excluded_volume);
+    ADD_INTERACTION_TO_MAP(DEBYE_HUCKEL, _debye_huckel);
 
     _parameter_kbkt = false;
 

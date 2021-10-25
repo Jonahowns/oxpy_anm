@@ -16,35 +16,72 @@
 
 #include "../Particles/RNANucleotide.h"
 #include "../Particles/ANMParticle.h"
+#include "../Particles/ANMTParticle.h"
 
 
-RNANMInteraction::RNANMInteraction() : RNA2Interaction() { // @suppress("Class members should be properly initialized")
-    // TODO: Re-examine These
+RNANMInteraction::RNANMInteraction(bool btp) : RNA2Interaction() { // @suppress("Class members should be properly initialized")
+
+    _angular = btp;
     //Protein Methods Function Pointers
-    _int_map[SPRING] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &RNANMInteraction::_protein_spring;
-    _int_map[PRO_EXC_VOL] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &RNANMInteraction::_protein_exc_volume;
+    ADD_INTERACTION_TO_MAP(SPRING, _protein_spring);
+    ADD_INTERACTION_TO_MAP(PRO_EXC_VOL, _protein_exc_volume);
+    if(_angular)
+        ADD_INTERACTION_TO_MAP(PRO_ANG_POT, _protein_ang_pot);
 
     //Protein-RNA Function Pointers
-    _int_map[PRO_RNA_EXC_VOL] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &RNANMInteraction::_protein_rna_exc_volume;
+    ADD_INTERACTION_TO_MAP(PRO_RNA_EXC_VOL, _protein_rna_exc_volume);
 
     //RNA Methods Function Pointers
-    _int_map[BACKBONE] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &RNANMInteraction::_backbone;
-    _int_map[COAXIAL_STACKING] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &RNANMInteraction::_coaxial_stacking;
-    _int_map[CROSS_STACKING] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &RNANMInteraction::_cross_stacking;
-    _int_map[BONDED_EXCLUDED_VOLUME] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &RNANMInteraction::_bonded_excluded_volume;
-    _int_map[STACKING] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &RNANMInteraction::_stacking;
-    _int_map[HYDROGEN_BONDING] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &RNANMInteraction::_hydrogen_bonding;
-    _int_map[NONBONDED_EXCLUDED_VOLUME] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &RNANMInteraction::_nonbonded_excluded_volume;
-    _int_map[DEBYE_HUCKEL] = (number (RNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces))  &RNANMInteraction::_debye_huckel;
+    ADD_INTERACTION_TO_MAP(BACKBONE, _backbone);
+    ADD_INTERACTION_TO_MAP(COAXIAL_STACKING, _coaxial_stacking);
+    ADD_INTERACTION_TO_MAP(CROSS_STACKING, _cross_stacking);
+    ADD_INTERACTION_TO_MAP(BONDED_EXCLUDED_VOLUME, _bonded_excluded_volume);
+    ADD_INTERACTION_TO_MAP(STACKING, _stacking);
+    ADD_INTERACTION_TO_MAP(HYDROGEN_BONDING, _hydrogen_bonding);
+    ADD_INTERACTION_TO_MAP(NONBONDED_EXCLUDED_VOLUME, _nonbonded_excluded_volume);
+    ADD_INTERACTION_TO_MAP(DEBYE_HUCKEL, _debye_huckel);
+
+    _parameter_kbkt = false;
+
+    masses = {{0, 1.f}, {1, 1.f}, {2, 1.f}, {3, 1.f}, {5, 1.f}, {6, 1.f}, //default mass is 1 for everything
+              {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},{11, 1.f}, {12, 1.f},
+              {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f}, {17, 1.f}, {18, 1.f},
+              {19, 1.f}, {20, 1.f}, {21, 1.f}, {22, 1.f}, {23, 1.f}, {24, 1.f}};
 }
 
 
 void RNANMInteraction::get_settings(input_file &inp){
     this->RNA2Interaction::get_settings(inp);
 
+    if(_angular){
+        float kb_tmp = -1.f;
+        float kt_tmp = -1.f;
+        getInputString(&inp, "parfile", _parameterfile, 1);
+        getInputFloat(&inp, "bending_k", &kb_tmp, 0);
+        _k_bend = (number) kb_tmp;
+
+        getInputFloat(&inp, "torsion_k", &kt_tmp, 0);
+        _k_tor = (number) kt_tmp;
+
+        if((_k_bend < 0 && kt_tmp >= 0) || (_k_tor < 0 && _k_bend >= 0)){
+            throw oxDNAException("Bending & Torsion Constants Must BOTH be set globally or in parameter file");
+        } else if(_k_bend >= 0 && _k_tor >= 0){
+            OX_LOG(Logger::LOG_INFO, "Using Global kb/kt values set in Input File");
+        } else if(_k_bend < 0 && _k_tor < 0){
+            OX_LOG(Logger::LOG_INFO, "No Global kb/kt values set in Input File, Attempting to read from Parameter File");
+            _parameter_kbkt = true;
+        }
+    }
+
     getInputString(&inp, "parfile", _parameterfile, 0);
     //Addition of Reading Parameter File
-    char n[5] = "none";
+
+    if(getInputString(&inp, "massfile", _massfile, 0) == KEY_NOT_FOUND) { // variable mass file
+        OX_LOG(Logger::LOG_INFO, "Using Default Masses"); // declared in constructor
+    } else {
+        OX_LOG(Logger::LOG_INFO, "Using Provided Massfile");
+        load_massfile(_massfile);
+    }
 
     auto valid_spring_params = [](int N, int x, int y, double d, char s, double k){
         if(x < 0 || x > N) throw oxDNAException("Invalid Particle ID %d in Parameter File", x);
@@ -54,10 +91,23 @@ void RNANMInteraction::get_settings(input_file &inp){
         if(k < 0) throw oxDNAException("Spring Constant %f Not Supported", k);
     };
 
+
+    //Checkers as Lambdas
+    auto valid_angles = [](double a, double b, double c, double d)
+    {
+        double anglemin = std::min({a, b, c, d});
+        double anglemax = std::max({a, b, c, d});
+        if (anglemin < -1.0 || anglemax > 1.0){
+            throw oxDNAException("Cos of Angle in Parameter File not in Valid bounds");
+        }
+    };
+
+    char n[5] = "none";
     if(strcmp(_parameterfile, n) != 0) {
         int key1, key2;
         char potswitch;
         double potential, dist;
+        double a0, b0, c0, d0;
         int N;
         std::fstream parameters;
         parameters.open(_parameterfile, std::ios::in);
@@ -69,6 +119,27 @@ void RNANMInteraction::get_settings(input_file &inp){
             {
                 valid_spring_params(N, key1, key2, dist, potswitch, potential);
                 spring_connection_num += 1;
+
+                // RNACT
+                if(_angular) {
+                    if (key2 - key1 == 1) {
+                        try {
+                            parameters >> a0 >> b0 >> c0 >> d0;
+                            valid_angles(a0, b0, c0, d0);
+                            if (_parameter_kbkt) {
+                                parameters >> _k_bend >> _k_tor;
+                                if (_k_bend < 0 || _k_tor < 0)
+                                    throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File");
+                                std::pair<double, double> ang_constants(_k_bend, _k_tor);
+                                _ang_stiff[key1] = ang_constants;
+                            }
+                            std::vector<double> angles{a0, b0, c0, d0};
+                            _ang_vals[key1] = angles;
+                        } catch(...){
+                            continue;
+                        }
+                    }
+                }
                 std::pair <int, int> lkeys (key1, key2);
                 std::pair <char, double> pot (potswitch, potential);
                 _rknot[lkeys] = dist;
@@ -80,7 +151,14 @@ void RNANMInteraction::get_settings(input_file &inp){
             throw oxDNAException("ParameterFile Could Not Be Opened");
         }
         parameters.close();
-        if(spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a RNACT Parameter File");
+        if (_angular) {
+            if (spring_connection_num == 1 && N > 2 && _parameter_kbkt)
+                throw oxDNAException(
+                        "Invalid Parameter File Format, pairwise kb and kt values incorrectly formatted or missing");
+            if (spring_connection_num == 1 && N > 2 && !_parameter_kbkt)
+                throw oxDNAException(
+                        "Invalid Parameter File Format, global kb and kt values have been set in Inputfile");
+        } else if (spring_connection_num == 1 && N > 2) throw oxDNAException("Invalid Parameter File Format, cannot use a DNACT Parameter File");
     } else {
         OX_LOG(Logger::LOG_INFO, "Parfile: NONE, No protein parameters were filled");
     }
@@ -97,16 +175,22 @@ void RNANMInteraction::check_input_sanity(std::vector<BaseParticle*> &particles)
 void RNANMInteraction::allocate_particles(std::vector<BaseParticle*> &particles) {
     if (nrna==0 || nrnas==0) {
         OX_LOG(Logger::LOG_INFO, "No RNA Particles Specified, Continuing with just Protein Particles");
-        for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
+        if (_angular) for (int i = 0; i < npro; i++) particles[i] = new ANMTParticle();
+        else for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
     } else if (npro == 0) {
         OX_LOG(Logger::LOG_INFO, "No Protein Particles Specified, Continuing with just RNA Particles");
         for (int i = 0; i < nrna; i++) particles[i] = new RNANucleotide();
     } else {
         if (_firststrand > 0){
             for (int i = 0; i < nrna; i++) particles[i] = new RNANucleotide();
-            for (uint i = nrna; i < particles.size(); i++) particles[i] = new ANMParticle();
+            // Protein
+            if (_angular) for (uint i = nrna; i < particles.size(); i++) particles[i] = new ANMTParticle();
+            else for (uint i = nrna; i < particles.size(); i++) particles[i] = new ANMParticle();
+
         } else {
-            for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
+            if (_angular) for (int i = 0; i < npro; i++) particles[i] = new ANMTParticle();
+            else for (int i = 0; i < npro; i++) particles[i] = new ANMParticle();
+            // RNA
             for (uint i = npro; i < particles.size(); i++) particles[i] = new RNANucleotide();
         }
     }
@@ -148,21 +232,28 @@ void RNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             allocate_particles(particles);
             for (int j = 0; j < my_N; j++) {
                 particles[j]->index = j;
-                particles[j]->type = 26; //A_INVALID
+                particles[j]->type = P_INVALID;
                 particles[j]->strand_id = 0;
             }
         }
 
         // Amino Acid
         if (strand < 0) {
+            BaseParticle *p = particles[i];
             char aminoacid[256];
             int nside, cside;
             ss >> aminoacid >> nside >> cside;
 
             int x;
             std::set<int> myneighs;
-            if (nside >= 0) myneighs.insert(nside);
-            if (cside >= 0) myneighs.insert(cside);
+            if (nside >= 0) {
+                myneighs.insert(nside);
+                if(_angular) p->n3 = particles[nside];
+            }
+            if (cside >= 0) {
+                myneighs.insert(cside);
+                if(_angular) p->n5 = particles[cside];
+            }
             while (ss.good()) {
                 ss >> x;
                 if (x < 0 || x >= my_N) {
@@ -171,21 +262,33 @@ void RNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 myneighs.insert(x);
             }
 
-            auto *p = dynamic_cast< ANMParticle * > (particles[i]);
+            if (_angular) {
+                auto *q = dynamic_cast< ANMTParticle * > (p);
+                for(auto & k : myneighs){
+                    if (p->index < k) {
+                        q->add_bonded_neighbor(particles[k]);
+                    }
+                }
+
+            } else {
+                auto *q = dynamic_cast< ANMParticle * > (p);
+                for(auto & k : myneighs){
+                    if (p->index < k) {
+                        q->add_bonded_neighbor(particles[k]);
+                    }
+                }
+            }
 
             if (strlen(aminoacid) == 1) {
                 p->type = Utils::decode_aa(aminoacid[0]);
                 p->btype = Utils::decode_aa(aminoacid[0]);
             }
 
+            p->mass = masses[p->btype];
+            p->massinverted = 1.f/p->mass;
+
             p->strand_id = abs(strand) + nrnas - 1;
             p->index = i;
-
-            for(auto & k : myneighs){
-                if (p->index < k) {
-                    p->add_bonded_neighbor(dynamic_cast<ANMParticle *> (particles[k]));
-                }
-            }
 
             i++;
         }
@@ -252,8 +355,7 @@ number RNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool
     if ((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) return this->pair_interaction_nonbonded(p, q, compute_r, update_forces);
 
     if (p->btype > 4 && q->btype > 4){
-        auto *cp = dynamic_cast< ANMParticle * > (p);
-        if ((*cp).is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
+        if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     }
     return 0.f;
@@ -272,11 +374,18 @@ number RNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         energy += _stacking(p, q, false, update_forces);
         return energy;
     } else if (p->btype > 4 && q->btype > 4){
-        auto *cp = dynamic_cast< ANMParticle * > (p);
-        if (!(*cp).is_bonded(q)) return 0.f;
-        number energy = _protein_spring(p, q, compute_r, update_forces);
-        energy += _protein_exc_volume(p, q, compute_r, update_forces);
-        return energy;
+        if(_angular){
+            if (!p->is_bonded(q)) return 0.f;
+            number energy = _protein_spring(p, q, compute_r, update_forces);
+            energy += _protein_exc_volume(p, q, compute_r, update_forces);
+            if (q->index - p->index == 1) energy += _protein_ang_pot(p, q, compute_r, update_forces);
+            return energy;
+        } else {
+            if (!p->is_bonded(q)) return 0.f;
+            number energy = _protein_spring(p, q, compute_r, update_forces);
+            energy += _protein_exc_volume(p, q, compute_r, update_forces);
+            return energy;
+        }
     } else
         return 0.f;
 
@@ -292,20 +401,16 @@ number RNANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
     number rnorm = _computed_r.norm();
     if (p->btype < 4 && q->btype < 4) { //RNA-RNA Interaction
         if (rnorm >= _sqr_rcut) return (number) 0.f;
-        number energy = RNAInteraction::pair_interaction_nonbonded(p, q, false, update_forces);
+        number energy = RNA2Interaction::pair_interaction_nonbonded(p, q, false, update_forces);
         energy += _debye_huckel(p, q, false, update_forces);
         return energy;
-    }
-
-    if ((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) {
-        if (rnorm >= _pro_rna_sqr_rcut) return (number) 0.f;
-        number energy = _protein_rna_exc_volume(p, q, compute_r, update_forces);
-        return energy;
-    }
-
-    if (p->btype > 4 && q->btype > 4) {
+    } else if (p->btype > 4 && q->btype > 4) { // protein-protein
         if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
         number energy = _protein_exc_volume(p, q, compute_r, update_forces);
+        return energy;
+    }else if((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) { //protein-dna
+        if (rnorm >= _pro_rna_sqr_rcut) return (number) 0.f;
+        number energy = _protein_rna_exc_volume(p, q, compute_r, update_forces);
         return energy;
     }
 
@@ -342,27 +447,35 @@ number RNANMInteraction::_protein_rna_exc_volume(BaseParticle *p, BaseParticle *
     LR_vector torquenuc(0,0,0);
     number energy;
 
-    if(r_to_back.module() < _pro_backbone_sqr_rcut) {
+    if(r_to_back.norm() < _pro_backbone_sqr_rcut) {
         energy = _protein_rna_repulsive_lj(r_to_back, force, update_forces, _pro_backbone_sigma, _pro_backbone_b, _pro_backbone_rstar,_pro_backbone_rcut,_pro_backbone_stiffness);
         //printf("back-pro %d %d %f\n",p->index,q->index,energy);
         if (update_forces) {
-            torquenuc  -= nuc->int_centers[RNANucleotide::BACK].cross(force);
+            torquenuc = nuc->int_centers[RNANucleotide::BACK].cross(-force);
+            nuc->torque += nuc->orientationT * torquenuc;
             nuc->force -= force;
             protein->force += force;
+            if(_angular){
+                r_to_back.normalize();
+                protein->torque += p->orientationT*(-r_to_back*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+            }
         }
     }
 
-    if(r_to_base.module() > _pro_base_sqr_rcut) return energy;
-
-    energy += _protein_rna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
-    if(update_forces) {
-        torquenuc  -= nuc->int_centers[RNANucleotide::BASE].cross(force);
-        nuc->torque += nuc->orientationT * torquenuc;
-
-        nuc->force -= force;
-        protein->force += force;
+    if(r_to_base.norm() < _pro_base_sqr_rcut){
+//        printf("pro %d dna %d\n", protein->index, nuc->index);
+        energy += _protein_rna_repulsive_lj(r_to_base, force, update_forces, _pro_base_sigma, _pro_base_b, _pro_base_rstar, _pro_base_rcut, _pro_base_stiffness);
+        if(update_forces) {
+            torquenuc = nuc->int_centers[RNANucleotide::BASE].cross(-force);
+            nuc->torque += nuc->orientationT * torquenuc;
+            nuc->force -= force;
+            protein->force += force;
+            if(_angular){
+                r_to_base.normalize();
+                protein->torque += p->orientationT*(-r_to_base*_pro_sigma*0.5f).cross(force); // dr Point of contact on protein particle relative to COM of protein particle
+            }
+        }
     }
-
 
     return energy;
 }
@@ -459,6 +572,10 @@ number RNANMInteraction::_protein_exc_volume(BaseParticle *p, BaseParticle *q, b
     {
         p->force -= force;
         q->force += force;
+        if(_angular){
+            p->torque += p->orientationT*(_computed_r*0.5).cross(-force);
+            q->torque += q->orientationT*(-_computed_r*0.5).cross(force);
+        }
     }
 
     return energy;
@@ -487,8 +604,91 @@ number RNANMInteraction::_protein_spring(BaseParticle *p, BaseParticle *q, bool 
     return energy;
 }
 
-RNANMInteraction::~RNANMInteraction() {
+
+number RNANMInteraction::_protein_ang_pot(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
+    // Get Angular Parameters
+    std::vector<double> &ang_params = _ang_vals[p->index];
+    double &a0 = ang_params[0];
+    double &b0 = ang_params[1];
+    double &c0 = ang_params[2];
+    double &d0 = ang_params[3];
+
+    if (_parameter_kbkt) { //Uses array with per particle kb and kt
+        _k_bend = this->_ang_stiff[p->index].first;
+        _k_tor = this->_ang_stiff[p->index].second;
+    } // If False, the global kb and kt will be used
+
+
+    LR_vector rij_unit = _computed_r;
+    rij_unit.normalize();
+    LR_vector rji_unit = rij_unit * -1.f;
+
+    LR_vector &a1 = p->orientationT.v1;
+    LR_vector &b1 = q->orientationT.v1;
+    LR_vector &a3 = p->orientationT.v3;
+    LR_vector &b3 = q->orientationT.v3;
+
+
+    double o1 = rij_unit * a1 - a0;
+    double o2 = rji_unit * b1 - b0;
+    double o3 = a1 * b1 - c0;
+    double o4 = a3 * b3 - d0;
+
+    //Torsion and Bending
+    number energy = _k_bend * 0.5f * (SQR(o1) + SQR(o2)) + _k_tor * 0.5f * (SQR(o3) + SQR(o4));
+
+    if (update_forces) {
+
+        LR_vector force = -(rji_unit.cross(rij_unit.cross(a1)) * _k_bend * o1 -
+                            rji_unit.cross(rij_unit.cross(b1)) * _k_bend * o2) / _computed_r.module();
+
+        p->force -= force;
+        q->force += force;
+
+        LR_vector ta = rij_unit.cross(a1) * o1 * _k_bend;
+        LR_vector tb = rji_unit.cross(b1) * o2 * _k_bend;
+
+        p->torque += p->orientationT * ta;
+        q->torque += q->orientationT * tb;
+
+        LR_vector torsion = a1.cross(b1) * o3 * _k_tor + a3.cross(b3) * o4 * _k_tor;
+
+        p->torque += p->orientationT * -torsion;
+        q->torque += q->orientationT * torsion;
+
+        //For Debugging, very helpful for CUDA comparisons
+        /*LR_vector<number> TA = p->orientationT * (ta - torsion);
+        LR_vector<number> TB = q->orientationT * (tb + torsion);
+
+        if (p->index ==104){
+            printf("p2 Angular F %.7f %.7f %.7f TA %.7f %.7f %.7f\n", -force.x, -force.y, -force.z, TA.x, TA.y, TA.z);
+        } else if (q->index ==104){
+            printf("q2 Angular F %.7f %.7f %.7f TB %.7f %.7f %.7f\n", force.x, force.y, force.z, TB.x, TB.y, TB.z);
+        }*/
+
+    }
+
+    return energy;
 }
+
+
+void RNANMInteraction::load_massfile(std::string &filename) {
+    std::fstream mass_stream;
+    int masstypes;
+    mass_stream.open(filename, std::ios::in);
+    if(mass_stream.is_open()) {
+        int type;
+        number mass;
+        mass_stream >> masstypes;
+        masses.clear(); // remove default masses
+        while (mass_stream >> type >> mass) {
+            masses[type] = (number) mass;
+        }
+    } else
+        throw oxDNAException("Could Not Load Mass File, Aborting");
+}
+
+RNANMInteraction::~RNANMInteraction() = default;
 
 
 

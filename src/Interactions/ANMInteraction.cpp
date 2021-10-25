@@ -21,9 +21,10 @@
 
 
 ANMInteraction::ANMInteraction() :
-                BaseInteraction<ANMInteraction>(){
-    _int_map[SPRING_POTENTIAL] = &ANMInteraction::_spring;
-    _int_map[EXC_VOL] = &ANMInteraction::_exc_volume;
+                BaseInteraction() {
+    ADD_INTERACTION_TO_MAP(SPRING_POTENTIAL, _spring);
+    ADD_INTERACTION_TO_MAP(EXC_VOL, _exc_volume);
+
     // default mass array
     masses = {{5, 1.f}, {6, 1.f}, {7, 1.f}, {8, 1.f}, {9, 1.f}, {10, 1.f},
             {11, 1.f}, {12, 1.f}, {13, 1.f}, {14, 1.f}, {15, 1.f}, {16, 1.f},
@@ -38,7 +39,7 @@ ANMInteraction::~ANMInteraction() {
 
 
 void ANMInteraction::get_settings(input_file &inp) {
-    IBaseInteraction::get_settings(inp);
+    BaseInteraction::get_settings(inp);
     char parameterfile[500];
     getInputString(&inp, "parfile", parameterfile, 1);
 
@@ -93,7 +94,7 @@ void ANMInteraction::allocate_particles(std::vector<BaseParticle *> &particles) 
 
 void ANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &particles) {
     int N_from_conf = particles.size();
-    IBaseInteraction::read_topology(N_strands, particles);
+    BaseInteraction::read_topology(N_strands, particles);
 
     int my_N, my_N_strands;
 

@@ -29,9 +29,10 @@ CGDNAInteraction::CGDNAInteraction(bool btp) : DNANMInteraction(btp) { // @suppr
 //    _int_map[PRO_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_protein_dna_exc_volume;
 
     //GS-DNA Function Pointers
-    _int_map[GS_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_exc_volume;
-    _int_map[GS_DNA_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_dna_exc_volume;
-    _int_map[GS_PRO_EXC_VOL] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_gs_pro_exc_volume;
+    ADD_INTERACTION_TO_MAP(GS_EXC_VOL, _gs_exc_volume);
+    ADD_INTERACTION_TO_MAP(GS_DNA_EXC_VOL, _gs_dna_exc_volume);
+//    ADD_INTERACTION_TO_MAP(GS_PRO_EXC_VOL, _gs_pro_exc_volume);
+//    _interaction_map[GS_PRO_EXC_VOL] = [this](BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm) &CGDNAInteraction::_gs_pro_exc_volume;6565
 
     //DNA Methods Function Pointers
 //    _int_map[BACKBONE] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_backbone;
