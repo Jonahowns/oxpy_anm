@@ -28,6 +28,7 @@
 #include "../../Forces/LJWall.h"
 #include "../../Forces/GenericCentralForce.h"
 #include "../../Forces/LJCone.h"
+#include "../../Forces/RepulsiveEllipsoid.h"
 
 #include <thrust/sort.h>
 #include <typeinfo>
@@ -44,95 +45,96 @@ MD_CUDABackend::MD_CUDABackend() :
 	_use_edge = false;
 	_any_rigid_body = false;
 
-	_massvalues = NULL;
-	_h_massInv = NULL;
-	_d_massInv = NULL; // mass arrays for variable Masses
+    _massvalues = nullptr;
+    _h_massInv = nullptr;
+    _d_massInv = nullptr; // mass arrays for variable Masses
+    _massfile = "default.txt";
 
-	_d_vels = _d_Ls = _d_forces = _d_torques = _d_buff_vels = NULL;
-	_h_vels = _h_Ls = _h_forces = _h_torques = _d_buff_Ls = NULL;
-	_h_gpu_index = _h_cpu_index = NULL;
-	_massfile = "default.txt";
+	_d_vels = _d_Ls = _d_forces = _d_torques = _d_buff_vels = nullptr;
+	_h_vels = _h_Ls = _h_forces = _h_torques = _d_buff_Ls = nullptr;
+	_h_gpu_index = _h_cpu_index = nullptr;
 
-	_d_particles_to_mols = _d_mol_sizes = NULL;
-	_d_molecular_coms = NULL;
+	_d_particles_to_mols = _d_mol_sizes = nullptr;
+	_d_molecular_coms = nullptr;
+	_d_buff_particles_to_mols = nullptr;
 
-	_h_ext_forces = NULL;
-	_d_ext_forces = NULL;
+	_h_ext_forces = nullptr;
+	_d_ext_forces = nullptr;
 
 	_restart_step_counter = false;
 	_avoid_cpu_calculations = false;
 
-	_timer_sorting = NULL;
+	_timer_sorting = nullptr;
 
 	_curr_step = -1;
 	_barostat_attempts = _barostat_accepted = 0;
 
 	_print_energy = false;
 
-	_obs_output_error_conf = NULL;
+	_obs_output_error_conf = nullptr;
 
 	// on CUDA the timers need to be told to explicitly synchronise on the GPU
 	TimingManager::instance()->enable_sync();
 }
 
 MD_CUDABackend::~MD_CUDABackend() {
-	if(_d_particles_to_mols != NULL) {
+	if(_d_particles_to_mols != nullptr) {
 		CUDA_SAFE_CALL(cudaFree(_d_particles_to_mols));
 	}
 
-	if(_d_massInv != NULL) {
-	    CUDA_SAFE_CALL(cudaFree(_d_massInv));
-	}
+    if(_d_massInv != nullptr) {
+        CUDA_SAFE_CALL(cudaFree(_d_massInv));
+    }
 
-	if(_d_vels != NULL) {
+	if(_d_vels != nullptr) {
 		CUDA_SAFE_CALL(cudaFree(_d_vels));
 		CUDA_SAFE_CALL(cudaFree(_d_Ls));
 		CUDA_SAFE_CALL(cudaFree(_d_forces));
 		CUDA_SAFE_CALL(cudaFree(_d_torques));
 	}
 
-	if(_d_molecular_coms != NULL) {
+	if(_d_molecular_coms != nullptr) {
 		CUDA_SAFE_CALL(cudaFree(_d_molecular_coms));
 	}
 
-	if(_sort_every > 0 && _d_buff_vels != NULL) {
+	if(_sort_every > 0 && _d_buff_vels != nullptr) {
 		CUDA_SAFE_CALL(cudaFree(_d_buff_vels));
 		CUDA_SAFE_CALL(cudaFree(_d_buff_Ls));
 		CUDA_SAFE_CALL(cudaFree(_d_buff_particles_to_mols));
 	}
 
-	if(_h_gpu_index != NULL) {
+	if(_h_gpu_index != nullptr) {
 		delete[] _h_gpu_index;
 		delete[] _h_cpu_index;
 	}
 
 	if(_external_forces) {
-		if(_h_ext_forces != NULL) {
+		if(_h_ext_forces != nullptr) {
 			delete[] _h_ext_forces;
 		}
-		if(_d_ext_forces != NULL) {
+		if(_d_ext_forces != nullptr) {
 			CUDA_SAFE_CALL(cudaFree(_d_ext_forces));
 		}
 	}
 
-	if(_h_massInv != NULL){
-	    delete[] _h_massInv;
-	}
+    if(_h_massInv != nullptr){
+        delete[] _h_massInv;
+    }
 
-	if(_h_vels != NULL) {
+	if(_h_vels != nullptr) {
 		delete[] _h_vels;
 		delete[] _h_Ls;
 		delete[] _h_forces;
 		delete[] _h_torques;
 	}
 
-	if(_obs_output_error_conf != NULL) {
+	if(_obs_output_error_conf != nullptr) {
 		delete _obs_output_error_conf;
 	}
 
-	if(_massvalues != NULL) {
-	    delete []_massvalues;
-	}
+    if(_massvalues != nullptr) {
+        delete []_massvalues;
+    }
 }
 
 void MD_CUDABackend::_host_to_gpu() {
@@ -177,7 +179,7 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 
 		_h_massInv[i] = 1.f/_massvalues[p->btype]; // fill _h_massInv array
 		//debug
-//		printf("particle %d, btype %d, _massvals[btype] %.3f, mass %.3f\n", i, p->btype, _massvalues[p->btype], _h_massInv[i]);
+        //printf("particle %d, btype %d, _massvals[btype] %.3f, mass %.3f\n", i, p->btype, _massvalues[p->btype], _h_massInv[i]);
 
 		if(p->index != myindex) {
 			throw oxDNAException("Could not treat the index of particle %d; remember that on CUDA the maximum c_number of particles is 2^21", p->index);
@@ -519,7 +521,7 @@ void MD_CUDABackend::sim_step(llint curr_step) {
 	_forces_second_step();
 	if(_print_energy) {
 		c_number energy = GpuUtils::sum_c_number4_to_double_on_GPU(_d_forces, N());
-		_backend_info = Utils::sformat("\tCUDA_energy: %lf", energy / N());
+		_backend_info = Utils::sformat("\tCUDA_energy: %lf", energy / (2. * N()));
 	}
 	cudaThreadSynchronize();
 	_timer_forces->pause();
@@ -535,7 +537,6 @@ void MD_CUDABackend::sim_step(llint curr_step) {
 void MD_CUDABackend::get_settings(input_file &inp) {
 	MDBackend::get_settings(inp);
 	CUDABaseBackend::get_settings(inp);
-
 
 	if(getInputBool(&inp, "use_edge", &_use_edge, 0) == KEY_FOUND) {
 		if(_use_edge && sizeof(c_number) == sizeof(double)) {
@@ -555,9 +556,9 @@ void MD_CUDABackend::get_settings(input_file &inp) {
         load_massfile(_massfile);
     }
     //Debug
-//    for(int i =0; i < 25; i++){
-//        printf("btype %d massval %.3f\n", i, _massvalues[i]);
-//    }
+    //    for(int i =0; i < 25; i++){
+    //        printf("btype %d massval %.3f\n", i, _massvalues[i]);
+    //    }
 
 	getInputBool(&inp, "restart_step_counter", &_restart_step_counter, 1);
 	getInputBool(&inp, "CUDA_avoid_cpu_calculations", &_avoid_cpu_calculations, 0);
@@ -612,7 +613,6 @@ void MD_CUDABackend::init() {
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<int>(&_d_particles_to_mols, sizeof(int) * N()));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<int>(&_d_mol_sizes, sizeof(int) * _molecules.size()));
 	CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number4>(&_d_molecular_coms, sizeof(c_number4) * _molecules.size()));
-
     CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<c_number>(&_d_massInv, sizeof(c_number) * N()));
 
 	CUDA_SAFE_CALL(cudaMemset(_d_forces, 0, _vec_size));
@@ -623,7 +623,6 @@ void MD_CUDABackend::init() {
 	_h_Ls = new c_number4[N()];
 	_h_forces = new c_number4[N()];
 	_h_torques = new c_number4[N()];
-
 	_h_massInv = new c_number[N()]; //variable masses
 
 
@@ -660,6 +659,7 @@ void MD_CUDABackend::init() {
 		ConstantRateTorque const_rate_torque;
 		GenericCentralForce generic_central;
 		LJCone LJ_cone;
+		RepulsiveEllipsoid repulsive_ellipsoid;
 
 		for(int i = 0; i < N(); i++) {
 			BaseParticle *p = _particles[i];
@@ -796,10 +796,19 @@ void MD_CUDABackend::init() {
 					force->ljcone.dir = make_float3(p_force->_direction.x, p_force->_direction.y, p_force->_direction.z);
 					force->ljcone.pos0 = make_float3(p_force->_pos0.x, p_force->_pos0.y, p_force->_pos0.z);
 				}
+				else if(typeid (*(p->ext_forces[j].get())) == typeid(repulsive_ellipsoid)) {
+					RepulsiveEllipsoid *p_force = (RepulsiveEllipsoid *) p->ext_forces[j].get();
+					force->type = CUDA_REPULSIVE_ELLIPSOID;
+					force->repulsiveellipsoid.stiff = p_force->_stiff;
+					force->repulsiveellipsoid.centre = make_float3(p_force->_centre.x, p_force->_centre.y, p_force->_centre.z);
+					force->repulsiveellipsoid.r_1 = make_float3(p_force->_r_1.x, p_force->_r_1.y, p_force->_r_1.z);
+					force->repulsiveellipsoid.r_2 = make_float3(p_force->_r_2.x, p_force->_r_2.y, p_force->_r_2.z);
+				}
 				else {
-					throw oxDNAException("Only ConstantRate, MutualTrap, MovingTrap, LowdimMovingTrap, RepulsionPlane, "
-							"RepulsionPlaneMoving, RepulsiveSphere, LJWall, ConstantRateTorque and GenericCentralForce "
-							"forces are supported on CUDA at the moment.\n");
+					throw oxDNAException("Only ConstantRate, MutualTrap, SkewTrap, MovingTrap, LowdimMovingTrap, "
+                          "RepulsionPlane, RepulsionPlaneMoving, RepulsiveSphere, LJWall, ConstantRateTorque, GenericCentralForce "
+                          "and RepulsiveEllipsoid"
+                          "forces are supported on CUDA at the moment.\n");
 				}
 			}
 		}
@@ -830,7 +839,7 @@ void MD_CUDABackend::init() {
 	}
 
 	// copy all the particle related stuff and the constants to device memory
-	apply_changes_to_simulation_data(); // fills _h_mass as well now
+	apply_changes_to_simulation_data();
 	_init_CUDA_MD_symbols();
 
 	_cuda_thermostat->set_seed(lrand48());

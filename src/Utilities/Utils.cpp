@@ -13,9 +13,6 @@
 
 #include <sstream>
 
-#include <errno.h>
-extern int errno;
-
 using std::string;
 
 namespace Utils {
@@ -178,7 +175,7 @@ std::vector<std::string> split(const string &s, char delim) {
 	return elems;
 }
 
-std::string sformat(const std::string &fmt, ...) {
+std::string sformat(std::string fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	std::string str = sformat_ap(fmt, ap);

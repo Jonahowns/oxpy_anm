@@ -1,3 +1,5 @@
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
 	SET(exe_name oxDNA_debug)
 	SET(lib_name common_debug)
@@ -63,7 +65,8 @@ SET(observables_SOURCES
 
 SET(backends_SOURCES
 	Backends/BackendFactory.cpp
-	Backends/SimBackend.cpp 
+	Backends/SimBackend.cpp
+	Backends/AnalysisBackend.cpp
 	Backends/MDBackend.cpp
 	Backends/MCBackend.cpp
 	Backends/MD_CPUBackend.cpp 
@@ -98,6 +101,7 @@ SET(lists_SOURCES
 SET(interactions_SOURCES
 	Interactions/InteractionFactory.cpp
 	Interactions/InteractionUtils.cpp
+	Interactions/Mesh.cpp
 	Interactions/BaseInteraction.cpp
 	Interactions/LJInteraction.cpp
 	Interactions/DNAInteraction.cpp
@@ -148,6 +152,7 @@ SET(forces_SOURCES
 	Forces/LowdimMovingTrap.cpp
 	Forces/MutualTrap.cpp
 	Forces/SkewTrap.cpp
+	Forces/RepulsiveEllipsoid.cpp
 	Forces/RepulsionPlane.cpp
 	Forces/RepulsionPlaneMoving.cpp
 	Forces/RepulsiveSphere.cpp
@@ -180,7 +185,7 @@ SET(common_SOURCES
 	Particles/Molecule.cpp
 	Particles/ANMParticle.cpp
 	Particles/ANMTParticle.cpp
-	Particles/ANMTParticle.cpp
+	Particles/GSParticle.cpp
 	Managers/SimManager.cpp
 	Utilities/OrderParameters.cpp
 	Utilities/Weights.cpp
@@ -194,6 +199,7 @@ SET(common_SOURCES
 	Utilities/time_scales/time_scales.cpp
 	Utilities/SignalManager.cpp
 	Utilities/ConfigInfo.cpp
+	Utilities/FlattenedConfigInfo.cpp
 	PluginManagement/PluginManager.cpp
 	${forces_SOURCES}
 	${observables_SOURCES}
@@ -207,7 +213,6 @@ SET(common_SOURCES
 SET(DNAnalysis_SOURCES
 	DNAnalysis.cpp
 	Managers/AnalysisManager.cpp
-	Backends/AnalysisBackend.cpp
 )
 
 SET(confGenerator_SOURCES
@@ -280,6 +285,7 @@ ELSE()
 		${common_SOURCES}
 		Utilities/Timings.cpp
 	)
+
 	ADD_EXECUTABLE(${exe_name} ${oxDNA_SOURCES})
 	ADD_EXECUTABLE(DNAnalysis ${DNAnalysis_SOURCES})
 	ADD_LIBRARY(${lib_name} ${common_SOURCES})
