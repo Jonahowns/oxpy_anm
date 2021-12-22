@@ -63,6 +63,11 @@ struct skew_trap {
     c_number rate;
     c_number val1;
     c_number val2;
+    c_number val3;
+    c_number val4;
+    c_number ddx;
+    c_number slope;
+    c_number intercept;
 };
 
 /**

@@ -696,8 +696,13 @@ void MD_CUDABackend::init() {
                     force->skew.r0 = p_force->_r0;
                     force->skew.p_ind = p_force->_p_ptr->index;
                     force->skew.PBC = p_force->PBC;
-                    force->skew.val1 = p_force->_val3;
-                    force->skew.val2 = p_force->_val4;
+                    force->skew.val1 = p_force->_val3; // - a^2/(2s^2)
+                    force->skew.val2 = p_force->_val6; // sqrt(2/pi) *s
+                    force->skew.val3 = p_force->_val4; // a/ (s*sqrt(2))
+                    force->skew.val4 = p_force->_val5; // 1/(s^2)
+                    force->skew.ddx = p_force->_ddx;
+                    force->skew.slope = p_force->_slope;
+                    force->skew.intercept = p_force->_intercept;
                 }
 				else if(typeid (*(p->ext_forces[j].get())) == typeid(moving_trap)) {
 					MovingTrap *p_force = (MovingTrap*) p->ext_forces[j].get();

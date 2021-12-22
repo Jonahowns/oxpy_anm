@@ -8,6 +8,7 @@
 #include "SkewTrap.h"
 #include "../Particles/BaseParticle.h"
 #include "../Boxes/BaseBox.h"
+#include <cmath>
 
 SkewTrap::SkewTrap() :
 				BaseForce() {
@@ -21,6 +22,8 @@ SkewTrap::SkewTrap() :
 	_val2 = 0.f;
 	_val3 = 0.f;
 	_val4 = 0.f;
+	_val5 = 0.f;
+	_val6 = 0.f;
 }
 
 std::tuple<std::vector<int>, std::string> SkewTrap::init(input_file &inp, BaseBox * box_ptr) {
@@ -34,10 +37,18 @@ std::tuple<std::vector<int>, std::string> SkewTrap::init(input_file &inp, BaseBo
 	getInputNumber(&inp, "rate", &_rate, 0);
 
 	// set precomputed values
-	_val1 = 1.f / (2*pow(_s, 2)); // 1/(2s^2)
-	_val2 = sqrt(2*PI) * _s; // Sqrt(2*Pi) * s
-	_val3 = -1.f/ pow(_s, 2); // -1/(2s^2)
-	_val4 = sqrt(2/PI);
+	_val1 = 1.f / (2.f*pow(_s, 2)); // 1/(2s^2)
+	_val2 = sqrt(2.f*PI) * _s; // Sqrt(2*Pi) * s
+	_val3 = -1.f*pow(_a, 2)/ (2*pow(_s, 2)); // - a^2/(2s^2)
+	_val4 = _a/(_s*sqrt(2.f)); // a/ (s*sqrt(2))
+    _val5 = 1.f / (pow(_s, 2)); // 1/(s^2)
+    _val6 = sqrt(2/PI) * _s; //sqrt(2/pi) *s
+
+    _ddx = 0.f;
+    _slope = 0.f;
+    _intercept = 0.f;
+
+    _find_discontinuity(); // fills the 3 values above
 
 	int N = CONFIG_INFO->particles().size();
 	if(_ref_id < 0 || _ref_id >= N) {
@@ -67,19 +78,165 @@ LR_vector SkewTrap::_distance(LR_vector u, LR_vector v) {
 }
 
 LR_vector SkewTrap::value(llint step, LR_vector &pos) {
-    // Calculates: - x/ (s^2) + (a e^((-1/2) *a^2 * x^2) * Sqrt(2/Pi)) / (1 + Erf[(a*x)/Sqrt(2)])]
+    // Calculates: (- x + (a e^((-1/2s^2) *a^2 * x^2) * Sqrt(2/Pi)) / (1 + Erf[(a*x)/Sqrt(2)])]) /  (s^2)
 	LR_vector dr = _distance(pos, _box_ptr->get_abs_pos(_p_ptr));
     number dx = dr.module() - (_r0 + (_rate * step));
-    number numerator = _a*exp(pow(dx, 2) * pow(_a, 2) * -0.5f) * _val3; // (a e^((-1/2) *a^2 * x^2) * Sqrt(2/Pi))
-    number denominator = 1 + erf(_a*dx*0.7071067811865475f); // 1 +Erf[ (a*x)/ Sqrt(2) ]
-    return (dr / dr.module()) * (dx * _val4 + numerator/denominator);
+    number f_mag;
+    if((dx > 0) == (_ddx > 0) && (abs(dx) >= abs(_ddx))){ // same sign and past discontinuous point
+        // Lin F
+//        f_mag = -_ddx*_slope - _intercept;
+
+         // Cub F
+//        f_mag = -4.f*pow(_ddx, 3)*_slope - _intercept;
+
+        // Hep F
+        f_mag = -8.f * _slope * pow(dx, 7) - _intercept;
+    } else {
+        number numerator = _a*exp(pow(dx, 2) * _val3) * _val6; // (a e^((-a^2/(2s^2))* x^2) * Sqrt(2/Pi)*s)
+        number denominator = 1 + erf(dx*_val4); // 1 +Erf[ (x) * a / (s*Sqrt(2)) ]
+        f_mag = (-dx + numerator/denominator)*_val5;
+    }
+
+//    printf("dx %.4f", dx);
+//    printf("force: %.4f \n", f_mag);
+    return -(dr / dr.module()) * f_mag;
 }
 
 number SkewTrap::potential(llint step, LR_vector &pos) {
-    // Calculates: Log[(e^(x^2/(2s^2))*Sqrt(2Pi)*s)  /  (1 + Erf[(a*x)/Sqrt(2)])]
+    // Calculates: Log[(e^(x^2/(2s^2))*Sqrt(2Pi)*s)  /  (1 + Erf[(a*x)/(s*Sqrt(2)]))]
 	LR_vector dr = _distance(pos, _box_ptr->get_abs_pos(_p_ptr));
     number dx = dr.module() - (_r0 + (_rate * step));
-    number numerator = exp(pow(dx, 2) * _val1) * _val2;
-    number denominator = 1 + erf(_a*dx*0.7071067811865475f); // 1 +Erf[ (a*x)/ Sqrt(2) ]
-	return log(numerator/denominator);
+
+    number pot;
+
+    if((dx > 0) == (_ddx > 0) && (abs(dx) >= abs(_ddx))){ // same sign and past discontinuous point
+        // Quadratic E
+//         pot = _slope/2 * pow(dx, 2) + _intercept * dx;
+
+        // Quart E
+//        pot = _slope * pow(dx, 4) + _intercept * dx;
+
+        // Oct E
+        pot = _slope*pow(dx, 8) + _intercept * dx;
+    } else {
+        //normal skew value
+        number numerator = exp(pow(dx, 2) * _val1) * _val2; // e^(x^2 *(1/(2s^2))*Sqrt(2Pi)) *s)
+        number denominator = 1 + erf(dx*_val4); // 1 +Erf[ (x) * a / (s*Sqrt(2)) ]
+        pot = log(numerator/denominator);
+    }
+
+	return pot;
+}
+
+number SkewTrap::_solution_term(number dx) {
+    // Calculates: Log[(e^(x^2/(2s^2))*Sqrt(2Pi)*s)  /  (1 + Erf[(a*x)/(s*Sqrt(2)]))]
+    number numerator = exp(pow(dx, 2) * _val1) * _s; // e^(x^2 *(1/(2s^2))*Sqrt(2Pi)) *s)
+    number denominator = 1 + erf(dx*_val4); // 1 +Erf[ (x) * a / (s*Sqrt(2)) ]
+    number pot = log(numerator/denominator);
+
+    return pot;
+}
+
+number SkewTrap::_force_mag(number dx) {
+    // Calculates: (- x + (a e^((-1/2s^2) *a^2 * x^2) * Sqrt(2/Pi)) / (1 + Erf[(a*x)/Sqrt(2)])]) /  (s^2)
+    number numerator = _a*exp(pow(dx, 2) * _val3) * _val6; // (a e^((-a^2/(2s^2))* x^2) * Sqrt(2/Pi)*s)
+    number denominator = 1 + erf(dx*_val4); // 1 +Erf[ (x) * a / (s*Sqrt(2)) ]
+
+//    printf("dx %.4f", dx);
+    number f = -(-dx + numerator/denominator)*_val5;;
+    return f;
+}
+
+void SkewTrap::_find_discontinuity()
+{
+    number x = 0.02;
+    bool discontinuity_found = false;
+    number oldforcepos = _force_mag(x);
+    number oldforceneg = _force_mag(-x);
+    number forcepos = _force_mag(x+0.02f), forceneg = _force_mag(-x-0.02f);
+    number posdir = (forcepos - oldforcepos)/abs(forcepos - oldforcepos);
+    number negdir = (forceneg - oldforceneg)/abs(forceneg - oldforceneg);
+
+
+    while(!discontinuity_found){
+        x += 0.002;
+        forcepos = _force_mag(x);
+        forceneg = _force_mag(-x);
+
+        if((forcepos - oldforcepos <0) == (posdir<0)){
+            oldforcepos = forcepos;
+        }else{
+            discontinuity_found = true;
+            _ddx = x - 0.004;
+            _calc_slope();
+            _calc_intercept();
+        }
+
+        if((forceneg - oldforceneg <0) == (negdir<0)){
+            oldforceneg = forceneg;
+        }else{
+            discontinuity_found = true;
+            _ddx = x + 0.004;
+            _calc_slope();
+            _calc_intercept();
+        }
+    }
+
+    // Debug
+//    _ddx = 0.4f;
+//    _calc_slope();
+//    _calc_intercept();
+    printf("Discontinuity x %.4f slope %.4f intercept %.4f \n", _ddx, _slope, _intercept);
+    printf("Skew Params s %.4f a %.4f \n", _s, _a);
+};
+
+void SkewTrap::_calc_slope(){
+    // quadratic E Linear F
+//    number term1 = 2.f/pow(_s, 2); // 2 / s^2
+//    number term2 = (2.f*_a*exp(- pow(_a, 2)* pow(_ddx,2)/ (2.f*pow(_s, 2))) * sqrt(2.f/PI)) /
+//            (_s*_ddx*(1+erf(_ddx*_val4)));
+//    number term3 = (log(2*PI) + 2* _solution_term(_ddx))/SQR(_ddx);
+//    _slope = term1 - term2 - term3;
+
+    // quart E cub F
+//    number term1 = _ddx*((_a*exp(- pow(_a, 2)* pow(_ddx,2)/ (2.f*pow(_s, 2)))*_val6)/(1+erf(_ddx*_val4)) -_ddx) / SQR(_s);
+//    number numerator = exp(pow(_ddx, 2) * _val1) * _val2; // e^(x^2 *(1/(2s^2))*Sqrt(2Pi)) *s)
+//    number denominator = 1 + erf(_ddx*_val4); // 1 +Erf[ (x) * a / (s*Sqrt(2)) ]
+//    number term2 = log(numerator/denominator);
+//    _slope = -(term1 + term2)/(3.f * pow(_ddx, 4));
+
+    // oct E hep F
+    number term1 = _ddx*((_a*exp(- pow(_a, 2)* pow(_ddx,2)/ (2.f*pow(_s, 2)))*_val6)/(1+erf(_ddx*_val4)) -_ddx) / SQR(_s);
+    number numerator = exp(pow(_ddx, 2) * _val1) * _val2; // e^(x^2 *(1/(2s^2))*Sqrt(2Pi)) *s)
+    number denominator = 1 + erf(_ddx*_val4); // 1 +Erf[ (x) * a / (s*Sqrt(2)) ]
+    number term2 = log(numerator/denominator);
+    _slope = -(term1 + term2)/(7.f * pow(_ddx, 8));
+}
+
+void SkewTrap::_calc_intercept(){
+    // quadratic E Linear F
+//    number term1 = _ddx/pow(_s, 2); // 2 / s^2
+//    number term2 = (_a*exp(- pow(_a, 2)* pow(_ddx,2)/ (2.f*pow(_s, 2))) * sqrt(2.f/PI)) /
+//                   (_s*(1+erf(_ddx*_val4)));
+//    number term3 = log(2*PI)/_ddx;
+//    number term4 = (2*_solution_term(_ddx))/_ddx;
+//    _intercept = -term1 + term2 + term3 + term4;
+
+    //quart E cub F
+//    number term1 = _ddx/pow(_s, 2); // x / s^2
+//    number term2 = (_a*exp(- pow(_a, 2)* pow(_ddx,2)/ (2.f*pow(_s, 2))) * sqrt(2.f/PI)) /
+//                   (_s*(1+erf(_ddx*_val4)));
+//    number term3 = 2.f*log(2*PI)/_ddx;
+//    number term4 = (4*_solution_term(_ddx))/_ddx;
+//
+//    _intercept = (-term1 + term2 + term3 + term4)/3.f;
+
+    // oct E hep F
+    number term1 = _ddx/pow(_s, 2); // 2 / s^2
+    number term2 = (_a*exp(- pow(_a, 2)* pow(_ddx,2)/ (2.f*pow(_s, 2))) * sqrt(2.f/PI)) /
+                   (_s*(1+erf(_ddx*_val4)));
+    number term3 = 4.f*log(2*PI)/_ddx;
+    number term4 = (8*_solution_term(_ddx))/_ddx;
+
+    _intercept = (-term1 + term2 + term3 + term4)/7.f;
 }

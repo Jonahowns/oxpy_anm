@@ -150,11 +150,26 @@ __global__ void set_external_forces(c_number4 *poss, GPU_quat *orientations, CUD
                 c_number dr_abs = _module(dr);
 
                 c_number dx = (dr_abs - (extF.skew.r0 + extF.skew.rate * step));
+                c_number mag;
+                // logic seems sound enough
+                bool sign = (dx > 0 == extF.skew.ddx > 0);
+                bool dist = abs(dx) >= abs(extF.skew.ddx);
+//                printf("dx %.4f sign %d dist %d \n", dx, sign, dist);
+                if(sign && dist){ //same sign and past discontinuity point
+                    // Lin F
+                    // mag = -extF.skew.slope * dx - extF.skew.intercept;
 
-                c_number mag = dx*extF.skew.val1 + ((extF.skew.a*exp(pow(dx, 2) * pow(extF.skew.a, 2) * -0.5f) *
-                        extF.skew.val2) / (1 + erf(extF.skew.a*dx*0.7071067811865475)));
+                    // Hep F
+                    mag = -8.f * extF.skew.slope * pow(dx, 7) - extF.skew.intercept;
+                    printf("fit dx %.4f skew mag %.4f sign %d dist %d\n", dx, mag, sign, dist);
+                } else {
+                    mag = (-dx + ((extF.skew.a*exp(pow(dx, 2) * extF.skew.val1) *  // _val1 = (-a^2/(2s^2)) val3 = a/ (s*sqrt(2)) _val2 = Sqrt(2 Pi)*s
+                                   extF.skew.val2) / (1 + erf(extF.skew.val3*dx)))) * extF.skew.val4;
+//                    printf("og dx %.4f skew mag %.4f sign %d dist %d\n", dx, mag, sign, dist);
+                }
+//                printf("dx %.4f skew mag %.4f \n", dx, mag);
 
-                c_number4 force = dr / dr_abs * mag;
+                c_number4 force = -dr / dr_abs * mag ;
 
                 F.x += force.x;
                 F.y += force.y;

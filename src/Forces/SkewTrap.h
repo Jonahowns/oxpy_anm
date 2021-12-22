@@ -24,6 +24,13 @@ public:
 	number _val2; // holds constant for calculations
 	number _val3; // holds constant for calculations
 	number _val4; // holds constant for calculations
+	number _val5; // holds constant for calculations
+	number _val6; // holds constant for calculations
+
+	number _ddx; // discontinuity x location
+	number _slope; // slope of linear line
+	number _intercept; // intercept of linear line
+
 	bool PBC;
 	BaseBox * _box_ptr;
 
@@ -38,6 +45,11 @@ public:
 
 protected:
 	LR_vector _distance(LR_vector u, LR_vector v);
+	number _force_mag(number dx);
+	number _solution_term(number dx);
+	void _find_discontinuity();
+	void _calc_slope();
+	void _calc_intercept();
 };
 
 #endif // SKEWTRAP_H
