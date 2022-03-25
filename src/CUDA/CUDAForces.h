@@ -23,6 +23,7 @@
 #define CUDA_REPULSIVE_SPHERE_SMOOTH 11
 #define CUDA_REPULSIVE_ELLIPSOID 12
 #define CUDA_TRAP_SKEW 13
+#define CUDA_MORSE 14
 
 /**
  * @brief CUDA version of a ConstantRateForce.
@@ -48,6 +49,21 @@ struct mutual_trap {
 	bool PBC;
 	c_number rate;
 };
+
+
+/**
+ * @brief CUDA version of a Morse.
+ */
+
+struct morse_trap {
+    int type;
+    c_number a;
+    c_number D;
+    c_number r0;
+    int p_ind;
+    bool PBC;
+};
+
 
 /**
  * @brief CUDA version of a SkewTrap.
@@ -218,6 +234,7 @@ union CUDA_trap {
 	mutual_trap mutual;
 	moving_trap moving;
 	skew_trap skew;
+	morse_trap morse;
 	lowdim_moving_trap lowdim;
 	repulsion_plane repulsionplane;
 	repulsion_plane_moving repulsionplanemoving;

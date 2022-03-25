@@ -86,12 +86,12 @@ void MD_CPUBackend::_first_step(llint curr_step) {
 	for(auto p : _particles) {
 		if(_use_builtin_langevin_thermostat) {
 			LR_vector p_plus = _langevin_c1 * p->vel + _langevin_c2 * LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian());
-			LR_vector dv = p->force*p->massinverted * (_dt * (number) 0.5); // To Do *eventually* add Inertia
+			LR_vector dv = p->force * (p->massinverted * _dt * (number) 0.5); // To Do *eventually* add Inertia
 			p->vel = p_plus + dv;
 			dr = (p_plus + dv) * _dt;
 		}
 		else {
-			p->vel += p->force*p->massinverted * (_dt * (number) 0.5); //ToDO *eventually* add inertia
+			p->vel += p->force*(p->massinverted * _dt * (number) 0.5); //ToDO *eventually* add inertia
 			dr = p->vel * _dt;
 		}
 		if(dr.norm() > 0.01) {
@@ -182,7 +182,7 @@ void MD_CPUBackend::_compute_forces() {
 
 void MD_CPUBackend::_second_step() {
 	for(auto p : _particles) {
-		p->vel += p->force*p->massinverted * _dt * (number) 0.5f; // ToDO *eventually* add inertia
+		p->vel += p->force*(p->massinverted * _dt * (number) 0.5f); // ToDO *eventually* add inertia
 		if(_use_builtin_langevin_thermostat) {
 			p->vel = _langevin_c1 * p->vel + _langevin_c2 * LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian());
 		}

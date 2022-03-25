@@ -412,6 +412,7 @@ number DNANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
         if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
         number energy = _protein_exc_volume(p, q, compute_r, update_forces);
         return energy;
+//        return 0.f;
     }else if((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) { //protein-dna
         if (rnorm >= _pro_dna_sqr_rcut) return (number) 0.f;
         number energy = _protein_dna_exc_volume(p, q, compute_r, update_forces);

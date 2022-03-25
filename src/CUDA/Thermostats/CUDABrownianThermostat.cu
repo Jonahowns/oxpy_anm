@@ -12,9 +12,11 @@
 
 #include <curand_kernel.h>
 
-__global__ void brownian_thermostat(curandState *rand_state, c_number *massesInv, c_number4 *vels, c_number4 *Ls, c_number rescale_factor, c_number pt, c_number pr, int N) {
+__global__ void brownian_thermostat(curandState *rand_state, c_number *massesInv, c_number4 *vels, c_number4 *Ls, c_number rescale_factor, c_number _pt_holder1, c_number _diff_coeff, c_number _T, c_number pr, int N) {
 	if(IND < N) {
 		curandState state = rand_state[IND];
+
+        c_number pt = (2 * _T * massesInv[IND] * _pt_holder1)/(massesInv[IND] * _T * _pt_holder1 + 2 * _diff_coeff);
 
 		if(curand_uniform(&state) < pt) {
 			c_number4 v;
@@ -82,5 +84,5 @@ void CUDABrownianThermostat::apply_cuda(c_number *d_massesInv, c_number4 *d_poss
 
 	brownian_thermostat
 		<<<this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block>>>
-		(this->_d_rand_state, d_massesInv, d_vels, d_Ls, this->_rescale_factor, this->_pt, this->_pr, CONFIG_INFO->N());
+		(this->_d_rand_state, d_massesInv, d_vels, d_Ls, this->_rescale_factor, this->_pt_holder1, this->_diff_coeff, this->_T, this->_pr, CONFIG_INFO->N());
 }

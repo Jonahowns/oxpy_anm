@@ -21,6 +21,7 @@
 #include "../../Forces/MovingTrap.h"
 #include "../../Forces/MutualTrap.h"
 #include "../../Forces/SkewTrap.h"
+#include "../../Forces/Morse.h"
 #include "../../Forces/RepulsionPlane.h"
 #include "../../Forces/RepulsionPlaneMoving.h"
 #include "../../Forces/RepulsiveSphere.h"
@@ -649,6 +650,7 @@ void MD_CUDABackend::init() {
 		ConstantRateForce const_force;
 		MutualTrap mutual_trap;
 		SkewTrap skew_trap;
+		Morse morse;
 		MovingTrap moving_trap;
 		LowdimMovingTrap lowdim_moving_trap;
 		RepulsionPlane repulsion_plane;
@@ -687,6 +689,15 @@ void MD_CUDABackend::init() {
 					force->mutual.p_ind = p_force->_p_ptr->index;
 					force->mutual.PBC = p_force->PBC;
 				}
+                else if(typeid (*(p->ext_forces[j].get())) == typeid(morse)) {
+                    Morse *p_force = (Morse*) p->ext_forces[j].get();
+                    force->type = CUDA_TRAP_MUTUAL;
+                    force->morse.a = p_force->_a;
+                    force->morse.D = p_force->_D;
+                    force->morse.r0 = p_force->_r0;
+                    force->morse.p_ind = p_force->_p_ptr->index;
+                    force->morse.PBC = p_force->PBC;
+                }
 				else if(typeid (*(p->ext_forces[j].get())) == typeid(skew_trap)) {
                     SkewTrap *p_force = (SkewTrap*) p->ext_forces[j].get();
                     force->type = CUDA_TRAP_SKEW;

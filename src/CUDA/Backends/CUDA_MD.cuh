@@ -143,6 +143,19 @@ __global__ void set_external_forces(c_number4 *poss, GPU_quat *orientations, CUD
 				F.z += force.z;
 				break;
 			}
+            case CUDA_MORSE: {
+                c_number4 qpos = poss[extF.morse.p_ind];
+
+                c_number4 dr = (extF.morse.PBC) ? box->minimum_image(ppos, qpos) : qpos - ppos;
+                c_number dr_abs = _module(dr);
+
+                c_number4 force = (dr / dr_abs)*2*extF.morse.a*extF.morse.D*exp(-extF.morse.a*dr_abs)*(1- exp(-extF.morse.a*dr_abs));
+
+                F.x += force.x;
+                F.y += force.y;
+                F.z += force.z;
+                break;
+            }
             case CUDA_TRAP_SKEW: {
                 c_number4 qpos = poss[extF.skew.p_ind];
 
