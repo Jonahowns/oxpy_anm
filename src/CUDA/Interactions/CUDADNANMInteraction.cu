@@ -202,8 +202,7 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
                         if (this->_parameter_kbkt) {
                             parameters >> _kbend >> _ktor;
                             if (_kbend < 0 || _ktor < 0)
-                                throw oxDNAException(
-                                        "Invalid pairwise kb/kt Value Declared in Parameter File. Check Par Formatting");
+                                throw oxDNAException("Invalid pairwise kb/kt Value Declared in Parameter File. Check Par Formatting");
                             _h_ang_kbkt[key1 * 2] = _kbend;
                             _h_ang_kbkt[key1 * 2 + 1] = _ktor;
                         }

@@ -21,7 +21,7 @@ diff_coeff = <float> (base diffusion coefficient. Either pt or diff_coeff should
 class BrownianThermostat : public BaseThermostat {
 protected:
 	int _newtonian_steps;
-	number _pt_holder1, _pr, _dt;
+	number _pt, _pr, _dt;
 	number _diff_coeff;
 	number _rescale_factor;
 public:

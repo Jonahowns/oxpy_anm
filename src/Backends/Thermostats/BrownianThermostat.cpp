@@ -11,7 +11,7 @@
 
 BrownianThermostat::BrownianThermostat () : BaseThermostat(){
 	_newtonian_steps = 0;
-	_pt_holder1 = (number) 0.f;
+	_pt = (number) 0.f;
 	_pr = (number) 0.f;
 	_dt = (number) 0.f;
 	_diff_coeff = (number) 0.f;
@@ -44,10 +44,10 @@ void BrownianThermostat::init() {
     BaseThermostat::init();
 
     // Save repeated value for calc.
-    _pt_holder1 = _newtonian_steps * _dt;
+    number _pt_holder1 = _newtonian_steps * _dt;
 
     // _pt for particle with mass of 1 (nucleotides)
-    number _pt = (2 * this->_T * _pt_holder1)/(this->_T * _pt_holder1 + 2 * _diff_coeff);
+    _pt = (2 * this->_T * _pt_holder1)/(this->_T * _pt_holder1 + 2 * _diff_coeff);
 
 	// initialize pr (considering Dr = 3Dt)
 	_diff_coeff = this->_T * _newtonian_steps * _dt * (1./_pt - 1./2.);
@@ -63,7 +63,6 @@ void BrownianThermostat::apply (std::vector<BaseParticle *> &particles, llint cu
 
 
 	for(auto p: particles) {
-        number _pt = (2 * this->_T * p->massinverted * _pt_holder1)/(p->massinverted * this->_T * _pt_holder1 + 2 * _diff_coeff);
 		if(drand48() < _pt) {
 			p->vel = LR_vector(Utils::gaussian(), Utils::gaussian(), Utils::gaussian()) * _rescale_factor*sqrt(p->massinverted);
 		}

@@ -261,8 +261,8 @@ void MD_CUDABackend::apply_simulation_data_changes() {
 		p->pos.z = _h_poss[i].z;
 
 		p->strand_id = _h_particles_to_mols[i];
-		p->mass = _h_massInv[i];
-		p->massinverted = 1.f/p->mass;
+        p->massinverted = _h_massInv[i];
+		p->mass = 1.f/p->massinverted;
 
 		// get index and type from the fourth component of the position
 		p->btype = (GpuUtils::float_as_int(_h_poss[i].w)) >> 22;
