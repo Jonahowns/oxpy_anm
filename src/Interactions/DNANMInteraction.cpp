@@ -280,10 +280,10 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
             if (strlen(aminoacid) == 1) {
                 p->type = Utils::decode_aa(aminoacid[0]);
-                p->btype = Utils::decode_aa(aminoacid[0]);
+                p->btype = 1; // btype of 1 means AA
             }
 
-            p->mass = masses[p->btype];
+            p->mass = masses[p->type];
             p->massinverted = 1.f/p->mass;
 
             p->strand_id = abs(strand) + ndnas - 1;
@@ -309,12 +309,13 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             // the base can be either a char or an integer
             if (strlen(base) == 1) {
                 p->type = Utils::decode_base(base[0]);
-                p->btype = Utils::decode_base(base[0]);
+                p->btype = 0;
 
             } else {
-                if (atoi(base) > 0) p->type = atoi(base) % 4;
-                else p->type = 3 - ((3 - atoi(base)) % 4);
-                p->btype = atoi(base);
+                throw oxDNAException("Only DNA Base Characters Permitted in DNA Strand in Topology");
+                //if (atoi(base) > 0) p->type = atoi(base) % 4;
+                //else p->type = 3 - ((3 - atoi(base)) % 4);
+                //p->btype = atoi(base);
             }
 
             if (p->type == P_INVALID) throw oxDNAException("Particle #%d in strand #%d contains a non valid base '%c'. Aborting", i, strand, base);
@@ -349,13 +350,15 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
 
 number DNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
-    if (p->btype < 4 && q->btype < 4){
+    int interaction_type = p->btype + q->btype;
+
+    if (interaction_type == 0){
         if(p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     }
-    if ((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) return this->pair_interaction_nonbonded(p, q, compute_r, update_forces);
+    if (interaction_type == 1) return this->pair_interaction_nonbonded(p, q, compute_r, update_forces);
 
-    if (p->btype > 4 && q->btype > 4){
+    if (interaction_type == 2){
         // ANM & ANMT call same functions here
         if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
@@ -369,13 +372,14 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         if (q != P_VIRTUAL && p != P_VIRTUAL)
             _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    if (p->btype < 4 && q->btype < 4){ // dna-dna
+    int interaction_type = p->btype + q->btype;
+    if (interaction_type == 0){ // dna-dna
         if(!this->_check_bonded_neighbour(&p, &q, compute_r)) return (number) 0;
         number energy = _backbone(p,q,compute_r,update_forces);
         energy += _bonded_excluded_volume(p,q,compute_r,update_forces);
         energy += _stacking(p,q,compute_r,update_forces);
         return energy;
-    } else if (p->btype > 4 && q->btype > 4){ // protein-protein
+    } else if (interaction_type == 2){ // protein-protein
         if(_angular){
             if (!p->is_bonded(q)) return 0.f;
             number energy = _protein_spring(p, q, compute_r, update_forces);
@@ -400,7 +404,10 @@ number DNANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
         _computed_r = this->_box->min_image(p->pos, q->pos);
 
     number rnorm = _computed_r.norm();
-    if (p->btype < 4 && q->btype < 4) { //DNA-DNA Interaction
+
+    int interaction_type = p->btype + q->btype;
+
+    if (interaction_type == 0) { //DNA-DNA Interaction
         if (rnorm >= _sqr_rcut) return (number) 0.f;
         number energy = _nonbonded_excluded_volume(p, q, compute_r, update_forces);
         energy += _hydrogen_bonding(p, q, compute_r, update_forces);
@@ -408,12 +415,12 @@ number DNANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
         energy += _coaxial_stacking(p, q, compute_r, update_forces);
         energy += _debye_huckel(p, q, compute_r, update_forces);
         return energy;
-    } else if (p->btype > 4 && q->btype > 4) { // protein-protein
+    } else if (interaction_type == 2) { // protein-protein
         if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
         number energy = _protein_exc_volume(p, q, compute_r, update_forces);
         return energy;
 //        return 0.f;
-    }else if((p->btype < 4 && q->btype > 4) || (p->btype > 4 && q->btype < 4)) { //protein-dna
+    }else if(interaction_type == 1) { //protein-dna
         if (rnorm >= _pro_dna_sqr_rcut) return (number) 0.f;
         number energy = _protein_dna_exc_volume(p, q, compute_r, update_forces);
         return energy;
@@ -431,13 +438,13 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
     LR_vector force(0, 0, 0);
     LR_vector rcenter = _computed_r;
 
-    if(p->btype < 4 && q->btype > 4)
+    if(p->btype == 0 && q->btype == 1)
     {
         //rcenter = -rcenter;
         protein = q;
         nuc = p;
     }
-    else if (p->btype > 4 && q->btype < 4)
+    else if (p->btype == 1 && q->btype == 0)
     {
         rcenter = -rcenter;
         protein = p;

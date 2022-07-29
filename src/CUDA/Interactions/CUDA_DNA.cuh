@@ -430,9 +430,9 @@ __device__ void _bonded_part(c_number4 &n5pos, c_number4 &n5x, c_number4 &n5y, c
 __device__ void _particle_particle_interaction(c_number4 ppos, c_number4 a1, c_number4 a2, c_number4 a3, c_number4 qpos, c_number4 b1, c_number4 b2, c_number4 b3, c_number4 &F, c_number4 &T, bool grooving, bool use_debye_huckel, bool use_oxDNA2_coaxial_stacking, LR_bonds pbonds, LR_bonds qbonds, int pind, int qind, CUDABox *box) {
 	int ptype = get_particle_type(ppos);
 	int qtype = get_particle_type(qpos);
-	int pbtype = get_particle_btype(ppos);
-	int qbtype = get_particle_btype(qpos);
-	int int_type = pbtype + qbtype;
+	//int pbtype = get_particle_btype(ppos);
+	//int qbtype = get_particle_btype(qpos);
+	int int_type = ptype + qtype;
 
 	c_number4 r = box->minimum_image(ppos, qpos);
 
@@ -465,7 +465,7 @@ __device__ void _particle_particle_interaction(c_number4 ppos, c_number4 a1, c_n
 	c_number4 rhydro = r + qpos_base - ppos_base;
 	c_number rhydromodsqr = CUDA_DOT(rhydro, rhydro);
 	if(int_type == 3 && SQR(HYDR_RCLOW) < rhydromodsqr && rhydromodsqr < SQR(HYDR_RCHIGH)) {
-		c_number hb_multi = (abs(qbtype) >= 300 && abs(pbtype) >= 300) ? MD_hb_multi[0] : 1.f;
+		c_number hb_multi = (abs(qtype) >= 300 && abs(ptype) >= 300) ? MD_hb_multi[0] : 1.f;
 		// versor and magnitude of the base-base separation
 		c_number rhydromod = sqrtf(rhydromodsqr);
 		c_number4 rhydrodir = rhydro / rhydromod;
@@ -986,9 +986,9 @@ __global__ void hb_op_precalc(c_number4 *poss, GPU_quat *orientations, int *op_p
 	// check whether hb energy is below a certain threshold for this nucleotide pair
 	int ptype = get_particle_type(ppos);
 	int qtype = get_particle_type(qpos);
-	int pbtype = get_particle_btype(ppos);
-	int qbtype = get_particle_btype(qpos);
-	int int_type = pbtype + qbtype;
+	//int pbtype = get_particle_btype(ppos);
+	//int qbtype = get_particle_btype(qpos);
+	int int_type = ptype + qtype;
 
 	GPU_quat po = orientations[pind];
 	GPU_quat qo = orientations[qind];
@@ -1048,9 +1048,11 @@ __global__ void near_hb_op_precalc(c_number4 *poss, GPU_quat *orientations, int 
 	// check whether hb energy is below a certain threshold for this nucleotide pair
 	int ptype = get_particle_type(ppos);
 	int qtype = get_particle_type(qpos);
-	int pbtype = get_particle_btype(ppos);
-	int qbtype = get_particle_btype(qpos);
-	int int_type = pbtype + qbtype;
+	//int pbtype = get_particle_btype(ppos);
+	//int qbtype = get_particle_btype(qpos);
+
+    //changed since btype and type were doing almost the same thing. Freed up btype to be used by other interactions
+	int int_type = ptype + qtype;
 
 	GPU_quat po = orientations[pind];
 	GPU_quat qo = orientations[qind];

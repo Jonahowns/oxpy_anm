@@ -1,12 +1,7 @@
 //
 // Created by jonah on 3/26/21.
 //
-/*
- * CUDADNAInteraction.cu
- *
- *  Created on: 22/feb/2013
- *      Author: lorenzo
- */
+
 
 #include "CUDADNANMInteraction.h"
 #include "CUDA_DNANM.cuh"

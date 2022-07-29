@@ -24,8 +24,8 @@
 #include "../Forces/LJCone.h"
 #include "../Forces/RepulsiveEllipsoid.h"
 #include "../Forces/Metadynamics/LTCOMTrap.h"
-#include "../Forces/skewtrap.h"
-#include "../Forces/morse.h"
+#include "../Forces/SkewTrap.h"
+#include "../Forces/Morse.h"
 
 #include "CUDAUtils.h"
 
@@ -104,6 +104,14 @@ struct morse_trap {
     bool PBC;
 };
 
+void init_Morse_from_CPU(morse_trap *cuda_force, Morse *cpu_force){
+    cuda_force->type = CUDA_TRAP_MUTUAL;
+    cuda_force->a = cpu_force->_a;
+    cuda_force->D = cpu_force->_D;
+    cuda_force->r0 = cpu_force->_r0;
+    cuda_force->p_ind = cpu_force->_p_ptr->index;
+    cuda_force->PBC = cpu_force->PBC;
+}
 
 /**
  * @brief CUDA version of a SkewTrap.
@@ -125,6 +133,24 @@ struct skew_trap {
     c_number slope;
     c_number intercept;
 };
+
+
+void init_SkewTrap_from_CPU(skew_trap *cuda_force, SkewTrap *cpu_force){
+    cuda_force->type = CUDA_TRAP_SKEW;
+    cuda_force->rate = cpu_force->_rate;
+    cuda_force->stdev = cpu_force->_s;
+    cuda_force->a = cpu_force->_a;
+    cuda_force->r0 = cpu_force->_r0;
+    cuda_force->p_ind = cpu_force->_p_ptr->index;
+    cuda_force->PBC = cpu_force->PBC;
+    cuda_force->val1 = cpu_force->_val3; // - a^2/(2s^2)
+    cuda_force->val2 = cpu_force->_val6; // sqrt(2/pi) *s
+    cuda_force->val3 = cpu_force->_val4; // a/ (s*sqrt(2))
+    cuda_force->val4 = cpu_force->_val5; // 1/(s^2)
+    cuda_force->ddx = cpu_force->_ddx;
+    cuda_force->slope = cpu_force->_slope;
+    cuda_force->intercept = cpu_force->_intercept;
+}
 
 /**
  * @brief CUDA version of a MovingTrap.

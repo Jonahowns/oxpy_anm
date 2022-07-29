@@ -31,8 +31,7 @@ CGDNAInteraction::CGDNAInteraction(bool btp) : DNANMInteraction(btp) { // @suppr
     //GS-DNA Function Pointers
     ADD_INTERACTION_TO_MAP(GS_EXC_VOL, _gs_exc_volume);
     ADD_INTERACTION_TO_MAP(GS_DNA_EXC_VOL, _gs_dna_exc_volume);
-//    ADD_INTERACTION_TO_MAP(GS_PRO_EXC_VOL, _gs_pro_exc_volume);
-//    _interaction_map[GS_PRO_EXC_VOL] = [this](BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm) &CGDNAInteraction::_gs_pro_exc_volume;6565
+    ADD_INTERACTION_TO_MAP(GS_PRO_EXC_VOL, _gs_pro_exc_volume);
 
     //DNA Methods Function Pointers
 //    _int_map[BACKBONE] = (number (DNAInteraction::*)(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces)) &CGDNAInteraction::_backbone;
@@ -108,6 +107,9 @@ void CGDNAInteraction::allocate_particles(std::vector<BaseParticle*> &particles)
 }
 
 void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> &particles) {
+    // particle btype is
+
+
     int my_N, my_N_strands;
 
     char line[5120];
@@ -160,7 +162,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
         }
     }
 
-    topology.seekg(0, std::ifstream::beg); // Unsure of this but CLion likes it
+    topology.seekg(0, std::ifstream::beg); // go back to start of the stream
     topology.getline(line, 5120); // Read the header so we can skip it
 
     strand = 0, i = 0;
@@ -197,11 +199,11 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 //generic sphere topology reading
                 tmp.erase(0, 2); // remove first 2 characters -> 'gs', left with subtype integer
                 subtype=stoi(tmp);
-                if(subtype> gs_subtype_num){
-                    gs_subtype_num = subtype;  // will substract 26 to get number
+                if(subtype > gs_subtype_num){
+                    gs_subtype_num = subtype;
                 }
-                p->type = 2; // used for interaction matrix calls
-                p->btype = subtype;// first 27 (0, 26) dna + protein subtypes
+                p->type = subtype + 27; // first 27 (0, 26) dna + protein subtypes
+                p->btype = 2; // used for interaction matrix calls
 
                 if (nside >= 0) {
                     myneighs.insert(nside);
@@ -227,7 +229,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                     }
                 }
 
-                p->mass = masses[p->btype];
+                p->mass = masses[p->type];
                 p->massinverted = 1.f/p->mass;
 
                 p->strand_id = abs(strand) + ndnas - 1;
@@ -271,11 +273,11 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 }
 
                 if (strlen(aminoacid) == 1) {
-                    p->type = 1;
-                    p->btype = Utils::decode_aa(aminoacid[0]);
+                    p->type = Utils::decode_aa(aminoacid[0]);
+                    p->btype = 1;
                 }
 
-                p->mass = masses[p->btype];
+                p->mass = masses[p->type];
                 p->massinverted = 1.f/p->mass;
 
                 p->strand_id = abs(strand) + ndnas - 1;
@@ -301,13 +303,14 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
             // the base can be either a char or an integer
             if (strlen(base) == 1) {
-                p->type = 0;
-                p->btype = Utils::decode_base(base[0]);
+                p->type = Utils::decode_base(base[0]);
+                p->btype = 0;
 
             } else {
-                if (atoi(base) > 0) p->type = atoi(base) % 4;
-                else p->type = 3 - ((3 - atoi(base)) % 4);
-                p->btype = atoi(base);
+                throw oxDNAException("Only DNA Base Characters Permitted in DNA Strand in Topology");
+                //if (atoi(base) > 0) p->type = atoi(base) % 4;
+                //else p->type = 3 - ((3 - atoi(base)) % 4);
+                //p->btype = atoi(base);
             }
 
             if (p->type == P_INVALID) throw oxDNAException("Particle #%d in strand #%d contains a non valid base '%c'. Aborting", i, strand, base);
@@ -327,7 +330,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
     }
 
-    gs_subtype_num -= 26;
+    //gs_subtype_num -= 27; Redid the way gs particles are declared in topology
 
     if (i < my_N)
         throw oxDNAException("Not enough particles found in the topology file (should be %d). Aborting", my_N);
@@ -339,7 +342,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
     *N_strands = my_N_strands;
 
-    // topolog y must be read for this
+    // topology must be read for this
     int N = gs_subtype_num;
     int excl_vol_interaction_size = N*N; // triangular matrix
     _gs_gs_exc_vol_params = new number[excl_vol_interaction_size * 5](); // each excl vol needs 5 params per interaction
@@ -398,7 +401,7 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 }
 
 number CGDNAInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
-    if(p->type == q->type){
+    if(p->btype == q->btype){
         if(p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     } else {
@@ -411,8 +414,8 @@ number CGDNAInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         if (q != P_VIRTUAL && p != P_VIRTUAL)
             _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    assert(p->type == q->type);
-    return (this->*_interaction_matrix_bonded[p->type])(p, q, compute_r, update_forces);
+    assert(p->btype == q->btype);
+    return (this->*_interaction_matrix_bonded[p->btype])(p, q, compute_r, update_forces);
 }
 
 number CGDNAInteraction::_gs_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
@@ -449,11 +452,11 @@ number CGDNAInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
     if (compute_r)
         _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    number rnorm = _computed_r.norm();
-    return (this->*_interaction_matrix_nonbonded[3*p->type + q->type])(p, q, compute_r, update_forces, rnorm);
+    return (this->*_interaction_matrix_nonbonded[3*p->btype + q->btype])(p, q, compute_r, update_forces);
 }
 
-number CGDNAInteraction::_dna_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+number CGDNAInteraction::_dna_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
+    number rnorm = _computed_r.norm();
     if (rnorm >= _sqr_rcut) return (number) 0.f;
     number energy = _nonbonded_excluded_volume(p, q, compute_r, update_forces);
     energy += _hydrogen_bonding(p, q, compute_r, update_forces);
@@ -463,27 +466,28 @@ number CGDNAInteraction::_dna_nonbonded(BaseParticle *p, BaseParticle *q, bool c
     return energy;
 }
 
-number CGDNAInteraction::_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+number CGDNAInteraction::_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
+    number rnorm = _computed_r.norm();
     if (rnorm >= _pro_sqr_rcut) return (number) 0.f;
     else return _protein_exc_volume(p, q, compute_r, update_forces);
 }
 
-number CGDNAInteraction::_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+number CGDNAInteraction::_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
     return _gs_exc_volume(p, q, compute_r, update_forces);
 }
 
-number CGDNAInteraction::_dna_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+number CGDNAInteraction::_dna_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
+    number rnorm = _computed_r.norm();
     if (rnorm >= _pro_dna_sqr_rcut) return (number) 0.f;
-    number energy = _protein_dna_exc_volume(p, q, compute_r, update_forces);
-    return energy;
+    return _protein_dna_exc_volume(p, q, compute_r, update_forces);
 }
 
-number CGDNAInteraction::_dna_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
+number CGDNAInteraction::_dna_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
     return _gs_dna_exc_volume(p, q, compute_r, update_forces);
 }
 
-number CGDNAInteraction::_pro_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm){
-    return _gs_pro_exc_volume(p, q, compute_r, update_forces, rnorm);
+number CGDNAInteraction::_pro_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
+    return _gs_pro_exc_volume(p, q, compute_r, update_forces);
 }
 
 number CGDNAInteraction::_repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness) {
@@ -518,13 +522,13 @@ number CGDNAInteraction::_gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bo
     LR_vector force(0, 0, 0);
     LR_vector rcenter = _computed_r;
 
-    if(p->type == 0)
+    if(p->btype == 0)
     {
         //rcenter = -rcenter;
         gs = q;
         nuc = p;
     }
-    else if (q->type == 0)
+    else if (q->btype == 0)
     {
         rcenter = -rcenter;
         gs = p;
@@ -539,7 +543,7 @@ number CGDNAInteraction::_gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bo
     LR_vector torquenuc(0,0,0);
     auto energy = (number) 0.f;
 
-    int i = gs->btype - 26;
+    int i = gs->type - 27;
 
     // backbone parameters
     number sigma, rstar, b, rc;
@@ -576,13 +580,13 @@ number CGDNAInteraction::_gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bo
     return energy;
 }
 
-number CGDNAInteraction::_gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm) {
+number CGDNAInteraction::_gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
     int i;
-    p->type < q-> type ? i=p->btype: i=q->btype; // highest type number is gs, assign to i
-    i -= 26;
+    p->btype < q->btype ? i=q->type: i=p->type; // highest btype number is gs, assign type to i
+    i -= 27;
 
     number sqr_rcut = _gs_other_exc_vol_params[5 * (3*i + 0) + 4];
-    if( sqr_rcut > rnorm) return 0.f;
+    if( _computed_r.norm() > sqr_rcut) return 0.f;
 
     number sigma = _gs_other_exc_vol_params[5 * (3*i + 0)];
     number rstar = _gs_other_exc_vol_params[5 * (3*i + 0) + 1];
@@ -600,12 +604,12 @@ number CGDNAInteraction::_gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bo
 }
 
 number CGDNAInteraction::_gs_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
-    int i = p->btype - 27;
-    int j = q->btype - 27;
+    int i = p->type-27; // ignores the first 27 types defined by dna bases and amino acids
+    int j = q->type-27;
     int &N = gs_subtype_num;
 
     number sqr_rcut = _gs_gs_exc_vol_params[5 * (i*N+ j)+4];
-    if( sqr_rcut > _computed_r.norm()) return 0.f;
+    if( _computed_r.norm() > sqr_rcut) return 0.f;
 
     number sigma = _gs_gs_exc_vol_params[5 * (i*N+ j)];
     number rstar = _gs_gs_exc_vol_params[5 * (i*N+ j)+1];
@@ -626,7 +630,7 @@ void CGDNAInteraction::init() {
     DNANMInteraction::init();
     ngs = 0, ngstrands = 0, npep = 0;
     // N(N+1)/2 possible pair interactions for N subtypes of gs particles
-    int N = gs_subtype_num;
+    //int N = gs_subtype_num;
 }
 
 void CGDNAInteraction::load_extra_file(std::string &filename) {

@@ -28,7 +28,7 @@ SkewTrap::SkewTrap() :
 	_s = 0.f;
 }
 
-std::tuple<std::vector<int>, std::string> SkewTrap::init(input_file &inp, BaseBox * box_ptr) {
+std::tuple<std::vector<int>, std::string> SkewTrap::init(input_file &inp) {
 	getInputInt(&inp, "particle", &_particle, 1);
 	getInputInt(&inp, "ref_particle", &_ref_id, 1);
 	getInputNumber(&inp, "r0", &_r0, 1);
@@ -59,8 +59,6 @@ std::tuple<std::vector<int>, std::string> SkewTrap::init(input_file &inp, BaseBo
 	}
 	_p_ptr = CONFIG_INFO->particles()[_ref_id];
 
-	_box_ptr = box_ptr;
-
 	if(_particle >= N || N < -1) {
 		throw oxDNAException("Trying to add a SkewTrap on non-existent particle %d. Aborting", _particle);
 	}
@@ -74,10 +72,12 @@ std::tuple<std::vector<int>, std::string> SkewTrap::init(input_file &inp, BaseBo
 }
 
 LR_vector SkewTrap::_distance(LR_vector u, LR_vector v) {
-	if(PBC)
-		return _box_ptr->min_image(u, v);
-	else
-		return v - u;
+    if(PBC) {
+        return CONFIG_INFO->box->min_image(u, v);
+    }
+    else {
+        return v - u;
+    }
 }
 
 LR_vector SkewTrap::value(llint step, LR_vector &pos) {

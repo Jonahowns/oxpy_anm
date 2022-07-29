@@ -219,11 +219,11 @@ void MD_CUDABackend::_apply_external_forces_changes() {
 				}
                 else if(force_type == typeid(SkewTrap)) {
 					SkewTrap *p_force = (SkewTrap *) p->ext_forces[j];
-					init_SkewTrap_from_CPU(&cuda_force->ltcomtrap, p_force, first_time);
+					init_SkewTrap_from_CPU(&cuda_force->skew, p_force);
 				}
                 else if(force_type == typeid(Morse)) {
 					Morse *p_force = (Morse *) p->ext_forces[j];
-					init_SkewTrap_from_CPU(&cuda_force->ltcomtrap, p_force, first_time);
+					init_Morse_from_CPU(&cuda_force->morse, p_force);
 				}
 				else {
 					throw oxDNAException("Only ConstantRate, MutualTrap, MovingTrap, LowdimMovingTrap, RepulsionPlane, "

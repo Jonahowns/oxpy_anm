@@ -40,7 +40,7 @@ protected:
         &CGDNAInteraction::_pro_bonded,
         &CGDNAInteraction::_gs_bonded
     };
-    number (CGDNAInteraction::*_interaction_matrix_nonbonded[9]) (BaseParticle *, BaseParticle *, bool, bool, number &){
+    number (CGDNAInteraction::*_interaction_matrix_nonbonded[9]) (BaseParticle *, BaseParticle *, bool, bool){
             &CGDNAInteraction::_dna_nonbonded,  // 0 0
             &CGDNAInteraction::_dna_pro_nonbonded,  // 0 1
             &CGDNAInteraction::_dna_gs_nonbonded,  // 0 2
@@ -105,7 +105,7 @@ protected:
 //        return true;
         // printf
         // printf("##### STARTING checking for %f\n",rstar);
-        double tolerance = 0.2;
+        //double tolerance = 0.2;
         LR_vector rr(0,0,rstar-0.2);
         LR_vector forcer(0,0,0);
         double stiff = 1.f;
@@ -159,14 +159,14 @@ public:
     void init() override;
     number _repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness);
     number _gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
-    number _gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm);
+    number _gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _gs_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
-    number _gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm);
-    number _dna_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm);
-    number _pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm);
-    number _pro_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm);
-    number _dna_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm);
-    number _dna_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces, number &rnorm);
+    number _gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    number _dna_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    number _pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    number _pro_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    number _dna_gs_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
+    number _dna_pro_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _gs_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _pro_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _dna_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);

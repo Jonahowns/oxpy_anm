@@ -464,6 +464,7 @@ __device__ void dnanm_particle_particle_interaction(c_number4 ppos, c_number4 a1
     int qtype = get_particle_type(qpos);
     int pbtype = get_particle_btype(ppos);
     int qbtype = get_particle_btype(qpos);
+
     int int_type = pbtype + qbtype;
 
     c_number4 r = box->minimum_image(ppos, qpos);
@@ -497,7 +498,8 @@ __device__ void dnanm_particle_particle_interaction(c_number4 ppos, c_number4 a1
     c_number4 rhydro = r + qpos_base - ppos_base;
     c_number rhydromodsqr = CUDA_DOT(rhydro, rhydro);
     if(int_type == 3 && SQR(HYDR_RCLOW) < rhydromodsqr && rhydromodsqr < SQR(HYDR_RCHIGH)) {
-        c_number hb_multi = (abs(qbtype) >= 300 && abs(pbtype) >= 300) ? MD_hb_multi[0] : 1.f;
+        //c_number hb_multi = (abs(qbtype) >= 300 && abs(pbtype) >= 300) ? MD_hb_multi[0] : 1.f;
+        c_number hb_multi = MD_hb_multi[0];
         // versor and magnitude of the base-base separation
         c_number rhydromod = sqrtf(rhydromodsqr);
         c_number4 rhydrodir = rhydro / rhydromod;
@@ -1321,7 +1323,9 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
     int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
     int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
 
-    if (pbtype > 4 && qbtype > 4) {
+    int interaction_type = pbtype + qbtype;
+
+    if (interaction_type == 2) {
         if(sqr_distance > MD_pro_sqr_rcut) return;
         //Protein-Protein Excluded Volume
         excluded_volume_quart_ang(r, dF, dT, qT, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
@@ -1342,13 +1346,13 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
 //        if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
 //            LR_atomicAddXYZ(&(torques[from_index]), dT);
 
-    } else if((pbtype < 4 && qbtype > 4) || (qbtype < 4 && pbtype > 4)) { // 1 particle is dna, 1 is protein
+    } else if(interaction_type == 1) { // 1 particle is dna, 1 is protein
         //Protein-DNA Excluded Volume **NONBONDED
         c_number4 nuc_back;
         c_number4 nuc_base;
         int *nucindx, *proindx;
         c_number4 rnuc;
-        if(pbtype > 4){
+        if(pbtype == 1){
             // assigns which is the protein and which is the nucleotide
             // nucleotide is q
             if(grooving) nuc_back = POS_MM_BACK1 * b1 + POS_MM_BACK2 * b2;
@@ -1400,7 +1404,7 @@ __global__ void dnanm_forces_edge_nonbonded_angular(c_number4 *poss, GPU_quat *o
         if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(torques[*proindx]), qT);
 
-    } else if(pbtype < 4 && qbtype < 4){ // dna- dna nonbonded
+    } else if(interaction_type == 0){ // dna- dna nonbonded
         LR_bonds pbonds = bonds[b.from];
         LR_bonds qbonds = bonds[b.to];
         dnanm_particle_particle_interaction(ppos, a1, a2, a3, qpos, b1, b2, b3, dF, dT, grooving,
@@ -1459,7 +1463,8 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
     int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
     int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
 
-    if (pbtype > 4 && qbtype > 4) {
+    int interaction_type = pbtype + qbtype;
+    if (interaction_type == 2) {
         if(sqr_distance > MD_pro_sqr_rcut) return;
         //Protein-Protein Excluded Volume
         excluded_volume_quart(r, dF, MD_pro_sigma, MD_pro_rstar, MD_pro_b, MD_pro_rc);
@@ -1475,7 +1480,7 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[to_index]), dF);
 
-    } else if ((pbtype < 4 && qbtype > 4) || (qbtype < 4 && pbtype > 4)) { // p is dna q is pro
+    } else if (interaction_type == 1) { // p is dna q is pro
         //Protein-DNA Excluded Volume **NONBONDED
         c_number4 nuc_back;
         c_number4 nuc_base;
@@ -1525,7 +1530,7 @@ __global__ void dnanm_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
             LR_atomicAddXYZ(&(forces[*proindx]), dF);
 
-    } else if(pbtype < 4 && qbtype < 4){ // dna- dna nonbonded
+    } else if(interaction_type == 0){ // dna- dna nonbonded
         LR_bonds pbonds = bonds[b.from];
         LR_bonds qbonds = bonds[b.to];
         dnanm_particle_particle_interaction(ppos, a1, a2, a3, qpos, b1, b2, b3, dF, dT, grooving,
@@ -1570,7 +1575,7 @@ __global__ void dnanm_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
     int pbtype = get_particle_btype(ppos);
     LR_bonds bs = bonds[IND];
 
-    if (pbtype < 4){
+    if (pbtype == 0){
         //Nucleotide
         // particle axes according to Allen's paper
 
@@ -1662,7 +1667,7 @@ __global__ void dnanm_forces_edge_bonded_angular(c_number4 *poss, GPU_quat *orie
     int pbtype = get_particle_btype(ppos);
     LR_bonds bs = bonds[IND];
 
-    if (pbtype < 4){
+    if (pbtype == 0){
         //Nucleotide
         // particle axes according to Allen's paper
         c_number4 a1, a2, a3;
