@@ -44,6 +44,8 @@ std::tuple<std::vector<int>, std::string> Morse::init(input_file &inp) {
 
 	std::string description = Utils::sformat("Morse (D=%g, a=%g, r0=%g, ref_particle=%d, PBC=%d)", _D, _a, _r0, _ref_id, PBC);
 
+    graph_data();
+
 	return std::make_tuple(std::vector<int>{_particle}, description);
 }
 
@@ -64,4 +66,40 @@ LR_vector Morse::value(llint step, LR_vector &pos) {   // Negative of Force
 number Morse::potential(llint step, LR_vector &pos) {
 	LR_vector dr = _distance(pos, _box_ptr->get_abs_pos(_p_ptr));
 	return _D*pow(1-exp(-_a*dr.module()), 2);
+}
+
+void Morse::graph_data(){
+    double x = -0.5;
+    double totaldist = 2.0;
+    int npoints = 1000;
+    double dt = totaldist/npoints;
+
+    double xarray [npoints];
+    double forcearray [npoints];
+    double energyarray [npoints];
+
+    for(int i = 0; i < npoints; i++){
+        x += dt;
+        xarray[i] = x;
+        forcearray[i] = 2*_a*_D*exp(-_a*x)*(1- exp(-_a*x));
+        energyarray[i] = _D*pow(1-exp(-_a*x), 2);
+    }
+
+    printf("Morse Potential X Values: [");
+    for(int i = 0; i < npoints; i++){
+        printf("%.4f,", xarray[i]);
+    }
+    printf("]\n");
+
+    printf("Morse Force Values: [");
+    for(int i = 0; i < npoints; i++){
+        printf("%.4f,", forcearray[i]);
+    }
+    printf("]\n");
+
+    printf("Morse Potential Values: [");
+    for(int i = 0; i < npoints; i++){
+        printf("%.4f,", energyarray[i]);
+    }
+    printf("]\n");
 }

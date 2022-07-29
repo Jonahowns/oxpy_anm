@@ -769,10 +769,10 @@ void MD_CUDABackend::load_massfile(std::string &filename) {
     mass_stream.open(filename, std::ios::in);
     if(mass_stream.is_open()) {
         int type;
-        c_number mass;
+        c_number mass, radii;
         mass_stream >> masstypes;
         _massvalues = new c_number[masstypes]();
-        while (mass_stream >> type >> mass) {
+        while (mass_stream >> type >> mass >> radii) {
             _massvalues[type] = (c_number) mass;
         }
     } else

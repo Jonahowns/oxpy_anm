@@ -31,6 +31,7 @@ public:
 
 	virtual LR_vector value(llint step, LR_vector &pos);
 	virtual number potential(llint step, LR_vector &pos);
+    void graph_data();
 
 protected:
 	LR_vector _distance(LR_vector u, LR_vector v);
