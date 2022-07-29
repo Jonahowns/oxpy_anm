@@ -4,15 +4,10 @@ SET(oxpy_SOURCES
 )
 
 IF(Python)
+	# tell pybind11 to use python3
+	set(PYBIND11_PYTHON_VERSION 3 CACHE STRING "Python version to use for compiling modules")
 	ADD_SUBDIRECTORY(pybind11)
 	ADD_DEFINITIONS(-DPYTHON_BINDINGS)
-	
-	if(CMAKE_VERSION VERSION_LESS "3.12")
-		FIND_PACKAGE( PythonLibs 3 REQUIRED )
-		FIND_PROGRAM( Python_EXECUTABLE "python3" )
-	else()
-		FIND_PACKAGE( Python 3 REQUIRED )
-	endif()
 	
 	INCLUDE_DIRECTORIES( ${PYTHON_INCLUDE_DIRS} )
 	MESSAGE(STATUS "The detected Python's include dirs are: ${PYTHON_INCLUDE_DIRS}" )
@@ -51,22 +46,25 @@ IF(Python)
 		${OXPY_OUTPUT_DIR}/utils.py
 	)
 	
-	# read the whole defs.h file
-	FILE(READ ${PROJECT_SOURCE_DIR}/src/defs.h all_defs)
-	# extract the release version
-	STRING(REGEX MATCH "#define RELEASE \"([^\"]+)\"" _ ${all_defs})
-	SET(fallback_release ${CMAKE_MATCH_1})
-	MESSAGE(STATUS "Fallback release parsed from defs.h: ${fallback_release}")
-
+	# add a target to test oxpy
+	add_custom_target(test_oxpy
+	    ${PROJECT_SOURCE_DIR}/test/TestSuite.py test_folder_list.txt ${PYTHON_EXECUTABLE} oxpy
+	    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test
+	    COMMENT "Running oxpy tests" VERBATIM
+	)
+	add_dependencies(test test_oxpy)
+	
 	CONFIGURE_FILE(make_install_setup.py
 		${OXPY_OUTPUT_DIR}/setup.py
 	)
 
 	# install the package
 	if(OxpySystemInstall)
-		INSTALL(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install ${OXPY_OUTPUT_DIR})")
+		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install ${OXPY_OUTPUT_DIR})")
+		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install ${PROJECT_SOURCE_DIR}/analysis)")
 	else()
-		INSTALL(CODE "execute_process(COMMAND ${Python_EXECUTABLE} -m pip install --user ${OXPY_OUTPUT_DIR})")
+		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install --user ${OXPY_OUTPUT_DIR})")
+		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install --user ${PROJECT_SOURCE_DIR}/analysis)")
 	endif()
 	
 ENDIF(Python)

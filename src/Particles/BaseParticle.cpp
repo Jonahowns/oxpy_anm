@@ -60,7 +60,7 @@ BaseParticle::~BaseParticle() {
 
 }
 
-bool BaseParticle::add_ext_force(ForcePtr f) {
+bool BaseParticle::add_ext_force(BaseForce *f) {
 	ext_forces.push_back(f);
 
 	return true;
