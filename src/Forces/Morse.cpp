@@ -16,7 +16,6 @@ Morse::Morse() :
 	_p_ptr = NULL;
 	_r0 = -1.;
 	PBC = false;
-	_box_ptr = NULL;
 	_a = 0.f;
 	_D = 0.f;
 }
@@ -59,12 +58,12 @@ LR_vector Morse::_distance(LR_vector u, LR_vector v) {
 }
 
 LR_vector Morse::value(llint step, LR_vector &pos) {   // Negative of Force
-	LR_vector dr = _distance(pos, _box_ptr->get_abs_pos(_p_ptr));
+	LR_vector dr = _distance(pos, CONFIG_INFO->box->get_abs_pos(_p_ptr));
 	return (dr / dr.module())*2*_a*_D*exp(-_a*dr.module())*(1- exp(-_a*dr.module()));
 }
 
 number Morse::potential(llint step, LR_vector &pos) {
-	LR_vector dr = _distance(pos, _box_ptr->get_abs_pos(_p_ptr));
+	LR_vector dr = _distance(pos, CONFIG_INFO->box->get_abs_pos(_p_ptr));
 	return _D*pow(1-exp(-_a*dr.module()), 2);
 }
 

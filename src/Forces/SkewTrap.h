@@ -32,7 +32,6 @@ public:
 	number _intercept; // intercept of linear line
 
 	bool PBC;
-	BaseBox * _box_ptr;
 
 	SkewTrap();
 	virtual ~SkewTrap() {

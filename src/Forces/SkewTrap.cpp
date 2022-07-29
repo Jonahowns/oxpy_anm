@@ -17,7 +17,6 @@ SkewTrap::SkewTrap() :
 	_p_ptr = NULL;
 	_r0 = -1.;
 	PBC = false;
-	_box_ptr = NULL;
 	_val1 = 0.f;
 	_val2 = 0.f;
 	_val3 = 0.f;
@@ -82,7 +81,7 @@ LR_vector SkewTrap::_distance(LR_vector u, LR_vector v) {
 
 LR_vector SkewTrap::value(llint step, LR_vector &pos) {
     // Calculates: (- x + (a e^((-1/2s^2) *a^2 * x^2) * Sqrt(2/Pi)) / (1 + Erf[(a*x)/Sqrt(2)])]) /  (s^2)
-	LR_vector dr = _distance(pos, _box_ptr->get_abs_pos(_p_ptr));
+	LR_vector dr = _distance(pos, CONFIG_INFO->box->get_abs_pos(_p_ptr));
     number dx = dr.module() - (_r0 + (_rate * step));
     number f_mag;
     if((dx > 0) == (_ddx > 0) && (abs(dx) >= abs(_ddx))){ // same sign and past discontinuous point
@@ -103,7 +102,7 @@ LR_vector SkewTrap::value(llint step, LR_vector &pos) {
 
 number SkewTrap::potential(llint step, LR_vector &pos) {
     // Calculates: Log[(e^(x^2/(2s^2))*Sqrt(2Pi)*s)  /  (1 + Erf[(a*x)/(s*Sqrt(2)]))]
-	LR_vector dr = _distance(pos, _box_ptr->get_abs_pos(_p_ptr));
+	LR_vector dr = _distance(pos, CONFIG_INFO->box->get_abs_pos(_p_ptr));
     number dx = dr.module() - (_r0 + (_rate * step));
 
     number pot;

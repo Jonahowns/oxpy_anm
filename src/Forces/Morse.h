@@ -19,7 +19,6 @@ public:
 	BaseParticle * _p_ptr;
 	number _r0;
 	bool PBC;
-	BaseBox * _box_ptr;
 	number _a;
 	number _D;
 
