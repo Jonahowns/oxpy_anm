@@ -66,9 +66,9 @@ protected:
     {
         rstar = interaction_radius;
         sigma = rstar + 0.001f;
-        b = _calc_b(sigma,rstar);
-        rc = _calc_rc(sigma,rstar);
-        return _check_repulsion_smoothness(sigma,rstar,b,rc);
+        b = _calc_b_quart(sigma,rstar);
+        rc = _calc_rc_quart(sigma,rstar);
+        return _check_repulsion_smoothness_quart(sigma,rstar,b,rc);
     }
 
     static number pow6(number x){
@@ -133,6 +133,40 @@ protected:
         return true;
     };
 
+    bool _check_repulsion_smoothness_quart(number sigma,number rstar, number b, number rc)
+    {
+        /*TODO IMPLEMENT ME NICER!*/
+//        return true;
+        // printf
+        // printf("##### STARTING checking for %f\n",rstar);
+        //double tolerance = 0.2;
+        LR_vector rr(0,0,rstar-0.2);
+        LR_vector forcer(0,0,0);
+        double stiff = 1.f;
+        number old_energy =  _repulsive_lj_quart(rr,forcer, true, sigma, b, rstar, rc, stiff);
+        number oldforce = forcer.norm();
+        for (double x = rstar-0.2; x < rc+0.01; x += 0.0001)
+        {
+            LR_vector r(0,0,x);
+            LR_vector force(0,0,0);
+            number energy_new = _repulsive_lj_quart(r,force, true, sigma, b, rstar, rc, stiff);
+            number force_new = force.norm();
+            //printf("#### %f %f %f \n",x,energy_new,force_new);
+            //if( fabs(old_energy - energy_new) > tolerance || fabs(force_new - oldforce) > tolerance || old_energy < energy_new)
+            if(  old_energy < energy_new || oldforce < force_new)
+            {
+                throw oxDNAException("Non-monotonous change in the repulsion potential for distance  r = %f",x);
+                return false;
+            }
+            else
+            {
+                old_energy = energy_new;
+                oldforce = force_new;
+            }
+        }
+        return true;
+    };
+
 
 public:
     enum {
@@ -158,6 +192,7 @@ public:
     void check_input_sanity(std::vector<BaseParticle *> &particles) override;
     void init() override;
     number _repulsive_lj(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness);
+    number _repulsive_lj_quart(const LR_vector &r, LR_vector &force, bool update_forces, number &sigma, number &b, number &rstar, number &rcut, number &stiffness);
     number _gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _gs_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);

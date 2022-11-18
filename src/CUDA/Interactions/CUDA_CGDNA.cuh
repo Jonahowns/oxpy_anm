@@ -863,10 +863,7 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
     c_number4 ppos = poss[b.from];
     c_number4 qpos = poss[b.to];
 
-    //int pbtype = get_particle_btype(ppos);
-    //int qbtype = get_particle_btype(qpos);
-
-    // 0 1 or 2 with 0 being gs, 1 being protein and 2 being dna
+    // 0 1 or 2 with 2 being gs, 1 being protein and 0 being dna
     int pbtype = get_particle_btype(ppos);
     int qbtype = get_particle_btype(qpos);
 
@@ -883,7 +880,7 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
     int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
     int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
 
-    // non unique, except if split up first by if pbtype == qbtype, which is what we will do
+    // non-unique, except if split up first by if pbtype == qbtype, which is what we will do
     int interaction_type = pbtype + qbtype;
 
     if(pbtype == qbtype){
@@ -910,7 +907,6 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
                                                 use_debye_huckel, use_oxDNA2_coaxial_stacking, pbonds, qbonds,
                                                 b.from, b.to, box);
 
-            //int from_index = MD_N[0]*(b.n_from % MD_n_forces[0]) + b.from;
             if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
                 LR_atomicAddXYZ(&(forces[from_index]), dF);
             if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
@@ -927,7 +923,6 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             dF.y = -dF.y;
             dF.z = -dF.z;
 
-            //int to_index = MD_N[0]*(b.n_to % MD_n_forces[0]) + b.to;
             if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
                 LR_atomicAddXYZ(&(forces[to_index]), dF);
             if ((dT.x * dT.x + dT.y * dT.y + dT.z * dT.z + dT.w * dT.w) > (c_number) 0.f)
@@ -938,13 +933,10 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             int p_ind = get_particle_type(ppos) - 27;
             int q_ind = get_particle_type(qpos) - 27;
 
-            c_number sqr_rcut = _d_gs_gs_exc_vol_params[5 * (p_ind*_gs_species + q_ind)+4];
-            if( sqr_distance > sqr_rcut) return;
-
-            c_number sigma = _d_gs_gs_exc_vol_params[5 * (p_ind*_gs_species + q_ind)];
-            c_number rstar = _d_gs_gs_exc_vol_params[5 * (p_ind*_gs_species + q_ind)+1];
-            c_number b_exc = _d_gs_gs_exc_vol_params[5 * (p_ind*_gs_species + q_ind)+2];
-            c_number rc = _d_gs_gs_exc_vol_params[5 * (p_ind*_gs_species + q_ind)+3];
+            c_number sigma = _d_gs_gs_exc_vol_params[4 * (p_ind*_gs_species + q_ind)];
+            c_number rstar = _d_gs_gs_exc_vol_params[4 * (p_ind*_gs_species + q_ind)+1];
+            c_number b_exc = _d_gs_gs_exc_vol_params[4 * (p_ind*_gs_species + q_ind)+2];
+            c_number rc = _d_gs_gs_exc_vol_params[4 * (p_ind*_gs_species + q_ind)+3];
 
             cgdna_excluded_volume(r, dF, sigma, rstar, b_exc, rc);
 
@@ -1046,20 +1038,17 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
 
             c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
 
-
             // 2 is backbone parameters
-            //c_number back_sqr_rcut = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 2) + 4];
-            c_number back_sigma = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 2)];
-            c_number back_rstar = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 2) + 1];
-            c_number back_b = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 2) + 2];
-            c_number back_rc = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 2) + 3];
+            c_number back_sigma = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2)];
+            c_number back_rstar = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2) + 1];
+            c_number back_b = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2) + 2];
+            c_number back_rc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2) + 3];
 
             // 1 is base parameters
-            //c_number base_sqr_rcut = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 1) + 4];
-            c_number base_sigma = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 1)];
-            c_number base_rstar = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 1) + 1];
-            c_number base_b = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 1) + 2];
-            c_number base_rc = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species + 1) + 3];
+            c_number base_sigma = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1)];
+            c_number base_rstar = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1) + 1];
+            c_number base_b = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1) + 2];
+            c_number base_rc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1) + 3];
 
             cgdna_excluded_volume(rback, Ftmp, back_sigma, back_rstar, back_b, back_rc);
             dT += _cross(nuc_back, Ftmp);
@@ -1108,13 +1097,11 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             // ignores the first 27 (0-26) types defined by dna bases and amino acids
             // protein-gs parameters are stored at 5*(gs_type*_gs_species + 0)
             // omitting the +0
-            c_number sqr_rcut = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species)+4];
-            if( sqr_distance > sqr_rcut) return;
 
-            c_number sigma = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species)];
-            c_number rstar = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species)+1];
-            c_number b_exc = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species)+2];
-            c_number rc = _d_gs_other_exc_vol_params[5 * (gs_type*_gs_species)+3];
+            c_number sigma = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)];
+            c_number rstar = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)+1];
+            c_number b_exc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)+2];
+            c_number rc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)+3];
 
             cgdna_excluded_volume(rgs, dF, sigma, rstar, b_exc, rc);
 

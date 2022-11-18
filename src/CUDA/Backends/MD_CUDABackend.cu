@@ -260,9 +260,9 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			throw oxDNAException("Could not treat the type (A, C, G, T or something specific) of particle %d; On CUDA, integer base types cannot be larger than 511 or smaller than -511");
 		}
 
-		_h_massInv[i] = 1.f/_massvalues[p->btype]; // fill _h_massInv array
+		_h_massInv[i] = 1.f/_massvalues[p->type]; // fill _h_massInv array
 		//debug
-        //printf("particle %d, btype %d, _massvals[btype] %.3f, mass %.3f\n", i, p->btype, _massvalues[p->btype], _h_massInv[i]);
+        //printf("particle %d, type %d, _massvals[type] %.3f, mass %.3f\n", i, p->type, _massvalues[p->type], _h_massInv[i]);
 
 		if(p->index != myindex) {
 			throw oxDNAException("Could not treat the index of particle %d; remember that on CUDA the maximum c_number of particles is 2^21", p->index);
@@ -640,10 +640,6 @@ void MD_CUDABackend::get_settings(input_file &inp) {
         OX_LOG(Logger::LOG_INFO, "Using Provided Massfile");
         load_massfile(_massfile);
     }
-    //Debug
-    //    for(int i =0; i < 25; i++){
-    //        printf("btype %d massval %.3f\n", i, _massvalues[i]);
-    //    }
 
 	getInputBool(&inp, "restart_step_counter", &_restart_step_counter, 1);
 	getInputBool(&inp, "CUDA_avoid_cpu_calculations", &_avoid_cpu_calculations, 0);

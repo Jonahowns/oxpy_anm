@@ -62,14 +62,6 @@ CUDACGDNAInteraction::CUDACGDNAInteraction(bool btp) : CGDNAInteraction(btp), CU
 
     _h_gs_other_exc_vol_params = NULL;
     _d_gs_other_exc_vol_params = NULL;
-    //above copied from CUDADNANMInteraction
-    //below is the new stuff needed for the CG Interaction
-
-    //_h_gs_other_exc_vol_params = NULL;
-    //_d_gs_other_exc_vol_params = NULL;
-    //
-    //_h_gs_gs_exc_vol_params = NULL;
-    //_d_gs_gs_exc_vol_params = NULL;
 }
 
 
@@ -132,7 +124,6 @@ void CUDACGDNAInteraction::cuda_init(c_number box_side, int N) {
     CUDABaseInteraction::cuda_init(box_side, N);
     CGDNAInteraction::init();
 
-//    Addition of Reading Parameter File -> Moved from get_settings due to needing to fill variables that are filled in the CPU version of DNANMInteraction::read_topology
     std::fstream top;
     int tmp1, tmp2;
     char line[5120];
@@ -232,7 +223,6 @@ void CUDACGDNAInteraction::cuda_init(c_number box_side, int N) {
             _gs_spring_eqdist[i] = dist;
             _gs_spring_potential[i] = potential;
         }
-
 
         auto valid_spring_params = [](int N, int x, int y, double d, char s, double k){
             if(x < 0 || x > N) throw oxDNAException("Invalid Particle ID %d in Parameter File", x);
@@ -553,69 +543,73 @@ void CUDACGDNAInteraction::cuda_init(c_number box_side, int N) {
 
     int gs_exc_vol_size = SQR(gs_species);
     int G = gs_species;
-    _h_gs_gs_exc_vol_params = new c_number[gs_exc_vol_size * 5]();
-    for(int i = 0; i<gs_exc_vol_size * 5; i++) _h_gs_gs_exc_vol_params[i] = 0.f;
+    _h_gs_gs_exc_vol_params = new c_number[gs_exc_vol_size * 4]();
+    for(int i = 0; i<gs_exc_vol_size * 4; i++) _h_gs_gs_exc_vol_params[i] = 0.f;
 
-    number sigma, rstar, rc, b, sqr_rcut, interaction_dist;
+    number max_rcut = 0.f; // max distance b/t nonbonded particles to consider
+    number sigma, rstar, rc, b, interaction_dist;
     bool success;
+
     // fill in parameters for each pair of radii
     for (int i = 0; i < G; i++) {
         for (int j = 0; j < G; j++) {
             if (i > j)
                 continue;
             interaction_dist = this->radii[27 + i] + this->radii[27 + j];
-            //printf("interaction dist %.3f \n", interaction_dist);
             success = _fill_in_constants(interaction_dist, sigma, rstar, b, rc);
             if(!success) throw oxDNAException("No smooth parameters found for gs particles gs types %d and %d", i, j);
-            //printf("sigma %.3f rstar %.3f b %.3f rc %.3f \n", sigma, rstar, b, rc);
-            sqr_rcut = SQR(rc);
-            // i*gs_subtype_num-(i-1)+j
-            _h_gs_gs_exc_vol_params[5 * (i*G + j)] = sigma;
-            _h_gs_gs_exc_vol_params[5 * (i*G + j) + 1] = rstar;
-            _h_gs_gs_exc_vol_params[5 * (i*G + j) + 2] = b;
-            _h_gs_gs_exc_vol_params[5 * (i*G + j) + 3] = rc;
-            _h_gs_gs_exc_vol_params[5 * (i*G + j) + 4] = sqr_rcut;
 
-            _h_gs_gs_exc_vol_params[5 * (j*G + i)] = sigma;
-            _h_gs_gs_exc_vol_params[5 * (j*G + i) + 1] = rstar;
-            _h_gs_gs_exc_vol_params[5 * (j*G + i) + 2] = b;
-            _h_gs_gs_exc_vol_params[5 * (j*G + i) + 3] = rc;
-            _h_gs_gs_exc_vol_params[5 * (j*G + i) + 4] = sqr_rcut;
+            // for debug
+            //printf("interaction dist %.3f \n", interaction_dist);
+            //printf("sigma %.3f rstar %.3f b %.3f rc %.3f \n", sigma, rstar, b, rc);
+
+            if(rc > max_rcut) max_rcut = rc;
+            // i*gs_subtype_num-(i-1)+j
+            _h_gs_gs_exc_vol_params[4 * (i*G + j)] = sigma;
+            _h_gs_gs_exc_vol_params[4 * (i*G + j) + 1] = rstar;
+            _h_gs_gs_exc_vol_params[4 * (i*G + j) + 2] = b;
+            _h_gs_gs_exc_vol_params[4 * (i*G + j) + 3] = rc;
+
+            _h_gs_gs_exc_vol_params[4 * (j*G + i)] = sigma;
+            _h_gs_gs_exc_vol_params[4 * (j*G + i) + 1] = rstar;
+            _h_gs_gs_exc_vol_params[4 * (j*G + i) + 2] = b;
+            _h_gs_gs_exc_vol_params[4 * (j*G + i) + 3] = rc;
         }
     }
 
     int excl_vol_pro_dna_size = G * 3;
-    _h_gs_other_exc_vol_params = new c_number[excl_vol_pro_dna_size * 5]();
-    for(int i = 0; i<excl_vol_pro_dna_size * 5; i++) _h_gs_other_exc_vol_params[i] = 0.f;
+    _h_gs_other_exc_vol_params = new c_number[excl_vol_pro_dna_size * 4]();
+    for(int i = 0; i<excl_vol_pro_dna_size * 4; i++) _h_gs_other_exc_vol_params[i] = 0.f;
     // fill in protein and dna excl volume
     for (int i = 0; i < G; i++) {
         for (int j = 0; j < 3; j++) {
             if (j == 0) {
                 _fill_in_constants(radii[i+27] + _pro_sigma / 2, sigma, rstar, b, rc); // protein 0
             } else if (j == 1) {
-                _fill_in_constants(radii[i+27] + _pro_base_sigma - .175f, sigma, rstar, b, rc); // base 1
+                _fill_in_constants(radii[i+27] + _pro_base_sigma - .175f, sigma, rstar, b, rc); // dna base 1
             } else if (j == 2) {
-                _fill_in_constants(radii[i+27] + _pro_backbone_sigma - .175f, sigma, rstar, b, rc); // backbone 2
+                _fill_in_constants(radii[i+27] + _pro_backbone_sigma - .175f, sigma, rstar, b, rc); // dna backbone 2
             } else {
                 throw oxDNAException("Problem filling in Excluded Volume Constants");
             }
-            sqr_rcut = SQR(rc);
-            _h_gs_other_exc_vol_params[5 * (3 * i + j)] = sigma;
-            _h_gs_other_exc_vol_params[5 * (3 * i + j) + 1] = rstar;
-            _h_gs_other_exc_vol_params[5 * (3 * i + j) + 2] = b;
-            _h_gs_other_exc_vol_params[5 * (3 * i + j) + 3] = rc;
-            _h_gs_other_exc_vol_params[5 * (3 * i + j) + 4] = sqr_rcut;
+
+            if(rc > max_rcut) max_rcut = rc;
+
+            _h_gs_other_exc_vol_params[4 * (3 * i + j)] = sigma;
+            _h_gs_other_exc_vol_params[4 * (3 * i + j) + 1] = rstar;
+            _h_gs_other_exc_vol_params[4 * (3 * i + j) + 2] = b;
+            _h_gs_other_exc_vol_params[4 * (3 * i + j) + 3] = rc;
         }
     }
 
-    CUDA_SAFE_CALL(cudaMalloc(&_d_gs_gs_exc_vol_params, gs_exc_vol_size * 5 * sizeof(c_number)));
-    CUDA_SAFE_CALL(cudaMemcpy(_d_gs_gs_exc_vol_params, _h_gs_gs_exc_vol_params, gs_exc_vol_size * 5 * sizeof(c_number), cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMalloc(&_d_gs_gs_exc_vol_params, gs_exc_vol_size * 4 * sizeof(c_number)));
+    CUDA_SAFE_CALL(cudaMemcpy(_d_gs_gs_exc_vol_params, _h_gs_gs_exc_vol_params, gs_exc_vol_size * 4 * sizeof(c_number), cudaMemcpyHostToDevice));
 
-    CUDA_SAFE_CALL(cudaMalloc(&_d_gs_other_exc_vol_params, excl_vol_pro_dna_size * 5 * sizeof(c_number)));
-    CUDA_SAFE_CALL(cudaMemcpy(_d_gs_other_exc_vol_params, _h_gs_other_exc_vol_params, excl_vol_pro_dna_size * 5 * sizeof(c_number), cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMalloc(&_d_gs_other_exc_vol_params, excl_vol_pro_dna_size * 4 * sizeof(c_number)));
+    CUDA_SAFE_CALL(cudaMemcpy(_d_gs_other_exc_vol_params, _h_gs_other_exc_vol_params, excl_vol_pro_dna_size * 4 * sizeof(c_number), cudaMemcpyHostToDevice));
 
+    _rcut = max_rcut; // set the rcut. Used by backend verlet lists
     /* Now all Parameters are copied to the device so we can go ahead and run the model */
-
 }
 
 void CUDACGDNAInteraction::compute_forces(CUDABaseList *lists, c_number4 *d_poss, GPU_quat *d_orientations, c_number4 *d_forces, c_number4 *d_torques, LR_bonds *d_bonds, CUDABox *d_box) {

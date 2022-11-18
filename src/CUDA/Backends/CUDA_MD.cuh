@@ -481,11 +481,12 @@ __global__ void second_step(c_number *massesInv, c_number4 *vels, c_number4 *Ls,
 	c_number4 F = forces[IND];
 	c_number4 v = vels[IND];
 
-    const c_number scale_factor = MD_dt[0] * (c_number) 0.5f * massesInv[IND];
+    const c_number scale_factor = MD_dt[0] * 0.5f;
+    const c_number scale_factor_mass = MD_dt[0] * (c_number) 0.5f * massesInv[IND];
 
-	v.x += F.x * scale_factor;
-	v.y += F.y * scale_factor;
-	v.z += F.z * scale_factor;
+	v.x += F.x * scale_factor_mass;
+	v.y += F.y * scale_factor_mass;
+	v.z += F.z * scale_factor_mass;
 	v.w = (v.x*v.x + v.y*v.y + v.z*v.z) * (c_number) 0.5f;
 
 	vels[IND] = v;
