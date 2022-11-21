@@ -35,11 +35,14 @@ protected:
     std::map<int, number> radii;
 
     number _gs_exc_vol_stiffness;
+
+    // indexed by type
     number (CGDNAInteraction::*_interaction_matrix_bonded[3])(BaseParticle *, BaseParticle *, bool, bool){
         &CGDNAInteraction::_dna_bonded,
         &CGDNAInteraction::_pro_bonded,
         &CGDNAInteraction::_gs_bonded
     };
+    // indexed by type
     number (CGDNAInteraction::*_interaction_matrix_nonbonded[9]) (BaseParticle *, BaseParticle *, bool, bool){
             &CGDNAInteraction::_dna_nonbonded,  // 0 0
             &CGDNAInteraction::_dna_pro_nonbonded,  // 0 1
@@ -205,7 +208,7 @@ public:
     number _gs_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _pro_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
     number _dna_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces);
-
+    int particle_id(int type);
 };
 
 #endif /* CGDNA_INTERACTION_H */

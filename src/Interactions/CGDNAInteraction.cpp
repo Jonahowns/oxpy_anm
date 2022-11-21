@@ -171,8 +171,8 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 if(subtype > gs_subtype_num){
                     gs_subtype_num = subtype;
                 }
-                p->type = subtype + 27; // first 27 (0, 26) dna + protein subtypes
-                p->btype = 2; // used for interaction matrix calls
+                p->btype = subtype + 27; // first 27 (0, 26) dna + protein subtypes
+                p->type = subtype + 27; // used for interaction matrix calls
 
                 if (nside >= 0) {
                     myneighs.insert(nside);
@@ -242,8 +242,8 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 }
 
                 if (strlen(aminoacid) == 1) {
+                    p->btype = Utils::decode_aa(aminoacid[0]);
                     p->type = Utils::decode_aa(aminoacid[0]);
-                    p->btype = 1;
                 }
 
                 p->mass = masses[p->type];
@@ -272,8 +272,8 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
             // the base can be either a char or an integer
             if (strlen(base) == 1) {
+                p->btype = Utils::decode_base(base[0]);
                 p->type = Utils::decode_base(base[0]);
-                p->btype = 0;
 
             } else {
                 throw oxDNAException("Only DNA Base Characters Permitted in DNA Strand in Topology");
@@ -298,8 +298,6 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
         if (strand == 0) throw oxDNAException("No strand 0 should be present please check topology file");
 
     }
-
-    //gs_subtype_num -= 27; Redid the way gs particles are declared in topology
 
     if (i < my_N)
         throw oxDNAException("Not enough particles found in the topology file (should be %d). Aborting", my_N);
@@ -372,8 +370,16 @@ void CGDNAInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
     _rcut = max_rcut;
 }
 
+// from type (0-4) DNA, (5-26) Protein, (27+) CGDNA
+// return index 0 for dna, 1 for protein and 2 for cgdna
+int CGDNAInteraction::particle_id(int type){
+    return (type <= 4) ? 0: (type >= 27) ? 2 : 1;
+}
+
 number CGDNAInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
-    if(p->btype == q->btype){
+    int pid = particle_id(p->type);
+    int qid = particle_id(q->type);
+    if(pid == qid){
         if(p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     } else {
@@ -386,8 +392,8 @@ number CGDNAInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         if (q != P_VIRTUAL && p != P_VIRTUAL)
             _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    assert(p->btype == q->btype);
-    return (this->*_interaction_matrix_bonded[p->btype])(p, q, compute_r, update_forces);
+    int pid = particle_id(p->type);
+    if(p->is_bonded(q)) return (this->*_interaction_matrix_bonded[pid])(p, q, compute_r, update_forces);
 }
 
 number CGDNAInteraction::_gs_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
@@ -424,7 +430,9 @@ number CGDNAInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
     if (compute_r)
         _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    return (this->*_interaction_matrix_nonbonded[3*p->btype + q->btype])(p, q, compute_r, update_forces);
+    int pid = particle_id(p->type);
+    int qid = particle_id(q->type);
+    return (this->*_interaction_matrix_nonbonded[3*pid + qid])(p, q, compute_r, update_forces);
 }
 
 number CGDNAInteraction::_dna_nonbonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
@@ -519,20 +527,17 @@ number CGDNAInteraction::_gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bo
     LR_vector force(0, 0, 0);
     LR_vector rcenter = _computed_r;
 
-    if(p->btype == 0)
+    int pid = particle_id(p->type);
+
+    if(pid == 0)
     {
-        //rcenter = -rcenter;
         gs = q;
         nuc = p;
-    }
-    else if (q->btype == 0)
-    {
+    } else {
         rcenter = -rcenter;
         gs = p;
         nuc = q;
     }
-    else
-        return 0.f;
 
     LR_vector r_to_back = rcenter  - nuc->int_centers[DNANucleotide::BACK];
     LR_vector r_to_base = rcenter  - nuc->int_centers[DNANucleotide::BASE];
@@ -577,7 +582,7 @@ number CGDNAInteraction::_gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bo
 
 number CGDNAInteraction::_gs_pro_exc_volume(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) {
     int i;
-    p->btype < q->btype ? i=q->type: i=p->type; // highest btype number is gs, assign type to i
+    p->type < q->type ? i=q->type: i=p->type; // highest type number is gs, assign type to i
     i -= 27;
 
     number sigma = _gs_other_exc_vol_params[4 * (3*i + 0)];

@@ -75,6 +75,10 @@ __constant__ bool MD_dh_half_charged_ends[1];
 
 #include "../cuda_utils/CUDA_lr_common.cuh"
 
+__forceinline__ __device__ int get_particle_id(int btype) {
+    return (btype <= 4) ? 0: (btype >= 27) ? 2 : 1;
+}
+
 __forceinline__ __device__ void cgdna_excluded_volume(const c_number4 &r, c_number4 &F, c_number sigma, c_number rstar, c_number b, c_number rc) {
     c_number rsqr = CUDA_DOT(r, r);
 
@@ -863,9 +867,12 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
     c_number4 ppos = poss[b.from];
     c_number4 qpos = poss[b.to];
 
-    // 0 1 or 2 with 2 being gs, 1 being protein and 0 being dna
     int pbtype = get_particle_btype(ppos);
     int qbtype = get_particle_btype(qpos);
+
+    // 0 1 or 2 with 2 being gs, 1 being protein and 0 being dna
+    int pid = get_particle_id(pbtype);
+    int qid = get_particle_id(qbtype);
 
     // particle axes according to Allen's paper
     c_number4 a1, a2, a3;
@@ -880,10 +887,10 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
     int from_index = MD_N[0] * (IND % MD_n_forces[0]) + b.from; //pindex
     int to_index = MD_N[0] * (IND % MD_n_forces[0]) + b.to; //qindex
 
-    // non-unique, except if split up first by if pbtype == qbtype, which is what we will do
-    int interaction_type = pbtype + qbtype;
+    // non-unique, except if split up first by if pid == qid, which is what we will do
+    int interaction_type = pid + qid;
 
-    if(pbtype == qbtype){
+    if(pid == qid){
         if(interaction_type == 2){ // protein-protein nonbonded interaction
             if(sqr_distance > MD_pro_sqr_rcut) return;
             //Protein-Protein Excluded Volume
@@ -930,8 +937,8 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
         }
         else if(interaction_type == 4){
             // ignores the first 27 (0-26) types defined by dna bases and amino acids
-            int p_ind = get_particle_type(ppos) - 27;
-            int q_ind = get_particle_type(qpos) - 27;
+            int p_ind = pbtype - 27;
+            int q_ind = qbtype - 27;
 
             c_number sigma = _d_gs_gs_exc_vol_params[4 * (p_ind*_gs_species + q_ind)];
             c_number rstar = _d_gs_gs_exc_vol_params[4 * (p_ind*_gs_species + q_ind)+1];
@@ -959,7 +966,7 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             c_number4 nuc_base;
             int *nucindx, *proindx;
             c_number4 rnuc;
-            if(pbtype == 1){
+            if(pid == 1){
                 // assigns which is the protein and which is the nucleotide
                 // nucleotide is q
                 if(grooving) nuc_back = POS_MM_BACK1 * b1 + POS_MM_BACK2 * b2;
@@ -1010,7 +1017,7 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             int gs_type;
             int *nucindx, *gsindx;
             c_number4 rnuc;
-            if(pbtype == 2){
+            if(pid == 2){
                 // assigns which is the gs and which is the nucleotide
                 // nucleotide is q
                 if(grooving) nuc_back = POS_MM_BACK1 * b1 + POS_MM_BACK2 * b2;
@@ -1020,7 +1027,7 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
                 gsindx = &from_index;
                 rnuc = -1*r;
 
-                gs_type = get_particle_type(ppos) - 27;
+                gs_type = pbtype - 27;
             } else {
                 //nucleotide is p
                 if(grooving) nuc_back = POS_MM_BACK1 * a1 + POS_MM_BACK2 * a2;
@@ -1030,7 +1037,7 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
                 gsindx = &to_index;
                 rnuc = r;
 
-                gs_type = get_particle_type(qpos) - 27;
+                gs_type = qbtype - 27;
             }
 
             c_number4 rback = rnuc - nuc_back;
@@ -1039,16 +1046,16 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             c_number4 Ftmp = make_c_number4(0, 0, 0, 0);
 
             // 2 is backbone parameters
-            c_number back_sigma = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2)];
-            c_number back_rstar = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2) + 1];
-            c_number back_b = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2) + 2];
-            c_number back_rc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 2) + 3];
+            c_number back_sigma = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 2)];
+            c_number back_rstar = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 2) + 1];
+            c_number back_b = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 2) + 2];
+            c_number back_rc = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 2) + 3];
 
             // 1 is base parameters
-            c_number base_sigma = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1)];
-            c_number base_rstar = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1) + 1];
-            c_number base_b = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1) + 2];
-            c_number base_rc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species + 1) + 3];
+            c_number base_sigma = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 1)];
+            c_number base_rstar = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 1) + 1];
+            c_number base_b = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 1) + 2];
+            c_number base_rc = _d_gs_other_exc_vol_params[4 * (gs_type*3 + 1) + 3];
 
             cgdna_excluded_volume(rback, Ftmp, back_sigma, back_rstar, back_b, back_rc);
             dT += _cross(nuc_back, Ftmp);
@@ -1057,6 +1064,12 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             cgdna_excluded_volume(rbase, Ftmp, base_sigma, base_rstar, base_b, base_rc);
             dT += _cross(nuc_base, Ftmp);
             dF += Ftmp;
+
+            // debugging
+            //printf("Partile %d btype %d pid %d, Particle %d btype %d pid %d, F %.3f, %.3f, %.3f \n",
+            //       b.from, pbtype, pid, b.to, qbtype, qid, dF.x, dF.y, dF.z);
+            //printf("Exc Vol Params base rstar %.3f sigma %.3f b %.3f rc %.3f\n", base_rstar, base_sigma, base_b, base_rc);
+            //printf("Exc Vol Params back rstar %.3f sigma %.3f b %.3f rc %.3f\n", back_rstar, back_sigma, back_b, back_rc);
 
             if ((dF.x * dF.x + dF.y * dF.y + dF.z * dF.z + dF.w * dF.w) > (c_number) 0.f)
                 LR_atomicAddXYZ(&(forces[*nucindx]), dF);
@@ -1076,32 +1089,31 @@ __global__ void cgdna_forces_edge_nonbonded(c_number4 *poss, GPU_quat *orientati
             int *gsindx, *proindx;
             int gs_type;
             c_number4 rgs;
-            if(pbtype == 1){
+            if(pid == 1){
                 // assigns which is the protein and which is the gs
                 // gs is q
                 gsindx = &to_index;
                 proindx = &from_index;
                 rgs = -1*r;
 
-                gs_type = get_particle_type(qpos) - 27;
+                gs_type = qbtype - 27;
             } else {
                 //gs is p
                 gsindx = &from_index;
                 proindx = &to_index;
                 rgs = r;
 
-                gs_type = get_particle_type(ppos) - 27;
+                gs_type = pbtype - 27;
             }
 
 
             // ignores the first 27 (0-26) types defined by dna bases and amino acids
             // protein-gs parameters are stored at 5*(gs_type*_gs_species + 0)
             // omitting the +0
-
-            c_number sigma = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)];
-            c_number rstar = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)+1];
-            c_number b_exc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)+2];
-            c_number rc = _d_gs_other_exc_vol_params[4 * (gs_type*_gs_species)+3];
+            c_number sigma = _d_gs_other_exc_vol_params[4 * (gs_type*3)];
+            c_number rstar = _d_gs_other_exc_vol_params[4 * (gs_type*3)+1];
+            c_number b_exc = _d_gs_other_exc_vol_params[4 * (gs_type*3)+2];
+            c_number rc = _d_gs_other_exc_vol_params[4 * (gs_type*3)+3];
 
             cgdna_excluded_volume(rgs, dF, sigma, rstar, b_exc, rc);
 
@@ -1132,9 +1144,10 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
     c_number4 ppos = poss[IND];
     // get btype of p
     int pbtype = get_particle_btype(ppos);
+    int pid = get_particle_id(pbtype);
     LR_bonds bs = bonds[IND];
 
-    if (pbtype == 0){
+    if (pid == 0){
         //Nucleotide
         // particle axes according to Allen's paper
 
@@ -1165,7 +1178,7 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
         LR_atomicAdd(&(forces[IND]), dF);
         LR_atomicAdd(&(torques[IND]), dT);
         torques[IND] = _vectors_transpose_c_number4_product(a1, a2, a3, torques[IND]);
-    } else if (pbtype == 1){
+    } else if (pid == 1){
         //Protein Particles
         //Spring
 
@@ -1195,7 +1208,7 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
 
         //Add totals to particle lists
         LR_atomicAdd(&(forces[IND]), ftotal);
-    } else if (pbtype == 2) {
+    } else if (pid == 2) {
         //GS Particles
         //Spring
 

@@ -260,7 +260,7 @@ void MD_CUDABackend::apply_changes_to_simulation_data() {
 			throw oxDNAException("Could not treat the type (A, C, G, T or something specific) of particle %d; On CUDA, integer base types cannot be larger than 511 or smaller than -511");
 		}
 
-		_h_massInv[i] = 1.f/_massvalues[p->type]; // fill _h_massInv array
+		_h_massInv[i] = 1.f/_massvalues[p->btype]; // fill _h_massInv array
 		//debug
         //printf("particle %d, type %d, _massvals[type] %.3f, mass %.3f\n", i, p->type, _massvalues[p->type], _h_massInv[i]);
 
@@ -764,12 +764,12 @@ void MD_CUDABackend::load_massfile(std::string &filename) {
     int masstypes;
     mass_stream.open(filename, std::ios::in);
     if(mass_stream.is_open()) {
-        int type;
+        int btype;
         c_number mass, radii;
         mass_stream >> masstypes;
         _massvalues = new c_number[masstypes]();
-        while (mass_stream >> type >> mass >> radii) {
-            _massvalues[type] = (c_number) mass;
+        while (mass_stream >> btype >> mass >> radii) {
+            _massvalues[btype] = (c_number) mass;
         }
     } else
         throw oxDNAException("Could Not Load Mass File, Aborting");
