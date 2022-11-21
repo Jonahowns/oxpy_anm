@@ -1,3 +1,45 @@
+v. 3.4.2
+	- Change libcommon.so to liboxdna_common.so, allowing the file to be reasonably placed in a system-wide / non-specific library directory
+	- Add methods to sync data from and to CUDA interactions (see 7e437f63a8c551333b677d56edc20121551741da)
+	- Fix a bug whereby confs without momenta would be printed with trailing spaces
+	- Fix a bug whereby the code wouldn't sometimes compile with CUDA 10.x
+	- Update a CUDA error message
+	- Fix some typos in the documentation
+	oxpy:
+	  - Fix a bug whereby oxpy couldn't be compiled in debug mode (-DDebug=True)
+	oat:
+	  - Fix external_force_utils import in exclude_force.py
+
+v. 3.4.1 
+	- Fix a compilation bug of a contrib observable
+
+v. 3.4 [1c89963]
+	- Observables can now update their data structures while the sim runs
+	- Add a new observable to compute the stress autocorrelation
+	- Normalise the behaviour of log-lin trajectories
+	- Improve error messages on CUDA
+	- Remove a deprecated function by reworking how textures are accessed
+	- Fix a bug whereby the kinetic energy was not correctly printed to configuration files (issue #22)
+	- Fix a bug whereby RNA simulations with CUDA11 would crash
+	- Fix a bug in the CUDA barostat that sometimes made the code crash
+	- Fix a bug whereby "use_average_seq" would be always interpreted as an int rather than a boolean value (issue #27)
+	- Fix a bug whereby the code would not compile on Apple systems (issue #30)
+	oxpy:
+		- Make it possible to access the last_conf observable from python
+		- Add a Jupyter Notebook example
+		- Make the code deallocate ConfigInfo at the end of each simulation
+		- Fix a bug whereby oxpy simulations on CUDA couldn't be run consequently
+		- Fix a bug whereby the ConfigInfo object wouldn't be accessible from Python through the analysis backend 
+	oat:
+		- Clarify python version requirements
+		- Change svd_align to not always align to (0, 0, 0)
+		- Add oxview visual bindings
+		- Update get_confs to handle times larger than the max value of int
+		- Update pca to have CLI control over how many oxView json files get printed (see issue #24)
+		- Add cli documentation to oat
+		- Fix a typo in db_to_force parser
+	- Several documentation improvements
+
 v. 3.3 [7cb66cf]
 	- Add variables to the input file
 	- Add support for mathematical expressions to the input file

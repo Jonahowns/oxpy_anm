@@ -6,7 +6,7 @@ The code requires [CMake](https://cmake.org/) and a c++-14-compliant `g++` (any 
 
 ### CUDA
 
-Compiling with CUDA support requires CMake >= 3.5 and a CUDA toolkit >= 9.0. If your current setup cannot meet these requirements we advise you to use [older versions of oxDNA](https://sourceforge.net/projects/oxdna/files/).
+Compiling with CUDA support requires CMake >= 3.5 and a CUDA toolkit >= 10. If your current setup cannot meet these requirements we advise you to use [older versions of oxDNA](https://sourceforge.net/projects/oxdna/files/).
 
 ### Python bindings
 
@@ -27,6 +27,19 @@ make -j4         # compile oxDNA. The -jX make option makes it compile the code 
 At the end of the compilation three executables (*oxDNA*, *DNAnalysis* and *confGenerator*) will be placed in the `build/bin` directory. 
 
 Compiling with Python bindings will also generate an `oxpy` package in the `build/oxpy` directory that can be imported in Python. Running `make install` will attempt to copy the package (as well as `oxDNA_analysis_tools`) to the `pip`'s module directory. The specific location will depend on your system's settings. We advise you to use [virtual environments](https://docs.python.org/3/tutorial/venv.html) (see *e.g.* [pipenv](https://docs.pipenv.org/)) to avoid conflicts with other packages and/or dependency and permission issues.
+
+### Updating a local copy
+
+If you cloned the repository to install oxDNA, your local copy can be updated with the following commands:
+
+```bash
+cd oxDNA        # enter the oxDNA folder
+git pull        # use git to synchronize your repo with the online one
+cd build        # enter the build folder (see above)
+make -j4        # compile the updated source
+```
+
+If you also want to update `oxpy` don't forget to run `make install` after the compilation.
 
 ### CMake options
 
@@ -60,6 +73,7 @@ If you are on your own machine or you installed Python via Anaconda, the `-DOxpy
 
 #### `oxpy`
 
+* When running `make` if you run into a problem at the end of compilation where it cannot find `python.h`, this means that you don't have the Python developer kit installed. See [this StackOverflow answer](https://stackoverflow.com/a/21530768/9738112) on how to install with a variety of package managers.
 * When compiling with the Python bindings enabled CMake will sometimes choose the wrong Python binary and/or include files, resulting in a failed compilation. If this happens the correct paths can be directly set from the command line as follows:
 	```bash
 	cmake .. -DPython=ON -DPYTHON_INCLUDE_DIRS=/path/to/python/include/dir -DPYTHON_EXECUTABLE=/path/to/python/binary

@@ -53,7 +53,7 @@ public:
 	const FlattenedConfigInfo &flattened_conf();
 
 	std::shared_ptr<ConfigInfo> config_info() {
-		return _config_info;
+		return CONFIG_INFO;
 	}
 
 	llint get_conf_step() {

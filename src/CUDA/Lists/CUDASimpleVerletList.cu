@@ -116,6 +116,7 @@ void CUDASimpleVerletList::_init_cells(c_number4 *poss) {
 		CUDA_SAFE_CALL(cudaFree(_d_cells));
 		CUDA_SAFE_CALL(cudaFree(_d_counters_cells));
 		_d_cells = _d_counters_cells = nullptr;
+		cudaDestroyTextureObject(_counters_cells_tex);
 		OX_DEBUG("Re-allocating cells on GPU, from %d to %d\n", _old_N_cells, _N_cells);
 	}
 
@@ -149,6 +150,21 @@ void CUDASimpleVerletList::_init_cells(c_number4 *poss) {
 		if(deallocate) {
 			CUDA_SAFE_CALL(cudaFree(poss));
 		}
+
+		// initialise the texture used to access the cell counters
+		cudaResourceDesc resDesc;
+		memset(&resDesc, 0, sizeof(resDesc));
+		resDesc.resType = cudaResourceTypeLinear;
+		resDesc.res.linear.devPtr = _d_counters_cells;
+		resDesc.res.linear.desc.f = cudaChannelFormatKindSigned;
+		resDesc.res.linear.desc.x = 32;
+		resDesc.res.linear.sizeInBytes = _N_cells * sizeof(int);
+
+		cudaTextureDesc texDesc;
+		memset(&texDesc, 0, sizeof(texDesc));
+		texDesc.readMode = cudaReadModeElementType;
+
+		cudaCreateTextureObject(&_counters_cells_tex, &resDesc, &texDesc, NULL);
 	}
 
 	_old_N_cells = _N_cells;
@@ -230,7 +246,7 @@ void CUDASimpleVerletList::update(c_number4 *poss, c_number4 *list_poss, LR_bond
 		(poss, _d_cells, _d_counters_cells, _d_cell_overflow, _d_cuda_box);
 	CUT_CHECK_ERROR("fill_cells (SimpleVerlet) error");
 
-	cudaThreadSynchronize();
+	cudaDeviceSynchronize();
 	if(_d_cell_overflow[0] == true) {
 		std::string message = Utils::sformat("A cell contains more than _max_n_per_cell (%d) particles:", _max_N_per_cell);
 
@@ -248,19 +264,17 @@ void CUDASimpleVerletList::update(c_number4 *poss, c_number4 *list_poss, LR_bond
 			}
 		}
 		else {
-			message += " the problem might be solved by increasing the value of max_density_multiplier (which defaults to 3) in the input file\n";
+			message += " This means (a) the box is too large for the simulation, or (b) your structure is very dense, or (c) the simulation exploded. "
+					"Try shrinking the simulation box, or setting 'cells_auto_optimisation = false' and 'max_density_multiplier = 10' (or more) in the input file.\n";
 		}
 		throw oxDNAException(message);
 	}
-
-	// texture binding for the number of particles contained in each cell
-	cudaBindTexture(0, counters_cells_tex, _d_counters_cells, sizeof(int) * _N_cells);
 
 	// for edge based approach
 	if(_use_edge) {
 		edge_update_neigh_list
 			<<<_cells_kernel_cfg.blocks, _cells_kernel_cfg.threads_per_block>>>
-			(poss, list_poss, _d_cells, d_matrix_neighs, d_number_neighs, _d_number_neighs_no_doubles, bonds, _d_cuda_box);
+			(_counters_cells_tex, poss, list_poss, _d_cells, d_matrix_neighs, d_number_neighs, _d_number_neighs_no_doubles, bonds, _d_cuda_box);
 		CUT_CHECK_ERROR("edge_update_neigh_list (SimpleVerlet) error");
 
 		// thrust operates on the GPU
@@ -277,9 +291,7 @@ void CUDASimpleVerletList::update(c_number4 *poss, c_number4 *list_poss, LR_bond
 	else {
 		simple_update_neigh_list
 			<<<_cells_kernel_cfg.blocks, _cells_kernel_cfg.threads_per_block>>>
-			(poss, list_poss, _d_cells, d_matrix_neighs, d_number_neighs, bonds, _d_cuda_box);
+			(_counters_cells_tex, poss, list_poss, _d_cells, d_matrix_neighs, d_number_neighs, bonds, _d_cuda_box);
 		CUT_CHECK_ERROR("update_neigh_list (SimpleVerlet) error");
 	}
-
-	cudaUnbindTexture(counters_cells_tex);
 }

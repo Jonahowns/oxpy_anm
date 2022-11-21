@@ -20,10 +20,10 @@ IF(Python)
 	SET(CMAKE_SHARED_LIBRARY_PREFIX "")
 	
 	# we need the oxDNA "common" library to be compiled so that the resulting code is position-independent and the library can be linked dynamically
-	SET_TARGET_PROPERTIES(common PROPERTIES POSITION_INDEPENDENT_CODE ON)
+	SET_TARGET_PROPERTIES(oxdna_common PROPERTIES POSITION_INDEPENDENT_CODE ON)
 	
 	ADD_LIBRARY(_oxpy_lib STATIC ${oxpy_SOURCES})
-	TARGET_LINK_LIBRARIES(_oxpy_lib ${PYTHON_LIBRARIES} common)
+	TARGET_LINK_LIBRARIES(_oxpy_lib oxdna_common)
 	SET_TARGET_PROPERTIES(_oxpy_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 	pybind11_add_module(core SHARED bindings.cpp)
 	TARGET_LINK_LIBRARIES(core PRIVATE _oxpy_lib)
@@ -61,10 +61,8 @@ IF(Python)
 	# install the package
 	if(OxpySystemInstall)
 		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install ${OXPY_OUTPUT_DIR})")
-		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install ${PROJECT_SOURCE_DIR}/analysis)")
 	else()
 		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install --user ${OXPY_OUTPUT_DIR})")
-		INSTALL(CODE "execute_process(COMMAND ${PYTHON_EXECUTABLE} -m pip install --user ${PROJECT_SOURCE_DIR}/analysis)")
 	endif()
 	
 ENDIF(Python)

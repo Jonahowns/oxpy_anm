@@ -29,6 +29,10 @@ $\vec{a}_1$, $\vec{a}_2 = \vec{a}_3 \times \vec{a}_1$ and $\vec{a}_3$ define the
   * stacking site $ = \vec{r} + 0.34 \, \vec{a}_1$;
   * backbone repulsion site $ = \vec{r} - 0.34 \, \vec{a}_1 + 0.3408 \, \vec{a}_2$.
   
+```{warning}
+The position of the centre of mass of the nucleotides in oxDNA1 (0.4 length units away from the backbone site) is different from what the PhD thesis of T. E. Ouldridge specifies (0.24 length units away from the backbone site). This change has no effect on the thermodynamics, and the extent to which it changes the dynamics is arguably very small.
+```
+  
 ```{note}
 When simulating very large structures the size of the trajectory files stored on disk may become very large. In this case it may be convenient to avoid printing the last six columns by setting `trajectory_print_momenta = false` in the input file, thus decreasing the size of the trajectory by $\approx 40\%$. 
 ```
@@ -85,7 +89,7 @@ This property can be leveraged to extend the canonical base pairing and create v
 For instance, $B = 13$, for which $B \bmod 4 = 1$, would correspond to a nucleotide with the same property of a Guanine. However, such a nucleotide would bond only to a nucleotide with base type $B' = -10$.
 
 ```{warning}
-The CUDA backend supports base types whose absolute values do not exceed $2^{10} - 1 = 511$. In other words, base types larger than $511$ or smaller than $-511$ are not allowed.
+The CUDA backend supports base types whose absolute values do not exceed $2^{9} - 1 = 511$. In other words, base types larger than $511$ or smaller than $-511$ are not allowed.
 ```
 
 ## Converting to and from oxDNA configurations
