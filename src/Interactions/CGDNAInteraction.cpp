@@ -479,7 +479,7 @@ number CGDNAInteraction::_repulsive_lj(const LR_vector &r, LR_vector &force, boo
         if(rnorm > SQR(rstar)) {
             number rmod = sqrt(rnorm);
             number rrc = rmod - rcut;
-            energy = stiffness * b * SQR(SQR(rrc));
+            energy = stiffness * b * SQR(rrc);
             if(update_forces) force = -r * (4 * stiffness * b * CUB(rrc) / rmod);
         }
         else {
@@ -574,7 +574,7 @@ number CGDNAInteraction::_gs_dna_exc_volume(BaseParticle *p, BaseParticle *q, bo
         torquenuc = nuc->int_centers[DNANucleotide::BASE].cross(-force);
         nuc->torque += nuc->orientationT * torquenuc;
         nuc->force -= force;
-        gs->force += force;
+            gs->force += force;
     }
 
     return energy;
