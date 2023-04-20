@@ -105,7 +105,7 @@ struct morse_trap {
 };
 
 void init_Morse_from_CPU(morse_trap *cuda_force, Morse *cpu_force){
-    cuda_force->type = CUDA_TRAP_MUTUAL;
+    cuda_force->type = CUDA_MORSE;
     cuda_force->a = cpu_force->_a;
     cuda_force->D = cpu_force->_D;
     cuda_force->r0 = cpu_force->_r0;
