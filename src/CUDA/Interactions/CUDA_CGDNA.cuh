@@ -79,7 +79,7 @@ __forceinline__ __device__ int get_particle_id(int btype) {
     return (btype <= 4) ? 0: (btype >= 27) ? 2 : 1;
 }
 
-__forceinline__ __device__ void cgdna_excluded_volume(const c_number4 &r, c_number4 &F, c_number &sigma, c_number &rstar, c_number &b, c_number &rc) {
+__forceinline__ __device__ void cgdna_excluded_volume(const c_number4 &r, c_number4 &F, c_number sigma, c_number rstar, c_number b, c_number rc) {
     c_number rsqr = CUDA_DOT(r, r);
 
     F.x = F.y = F.z = F.w = (c_number) 0.f;
@@ -1137,22 +1137,19 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
                                          c_number *_d_gs_aff_gamma,  int *_d_pro_affected_indx, int *_d_gs_affected_indx, int *_d_pro_affected, int *_d_gs_affected) {
     if(IND >= MD_N[0]) return;
 
-    c_number4 F = forces[IND];
-    c_number4 T = make_c_number4(0, 0, 0, 0);
-//    c_number4 dF = make_c_number4(0, 0, 0, 0);
-//    c_number4 dT = make_c_number4(0, 0, 0, 0);
-//    c_number4 ftotal = make_c_number4(0, 0, 0, 0);
+    c_number4 dF = make_c_number4(0, 0, 0, 0);
+    c_number4 dT = make_c_number4(0, 0, 0, 0);
+    c_number4 ftotal = make_c_number4(0, 0, 0, 0);
 
     c_number4 ppos = poss[IND];
     // get btype of p
     int pbtype = get_particle_btype(ppos);
     int pid = get_particle_id(pbtype);
-
+    LR_bonds bs = bonds[IND];
 
     if (pid == 0){
         //Nucleotide
         // particle axes according to Allen's paper
-        LR_bonds bs = bonds[IND];
 
         c_number4 a1, a2, a3;
         get_vectors_from_quat(orientations[IND], a1, a2, a3);
@@ -1163,7 +1160,7 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
             c_number4 b1, b2, b3;
             get_vectors_from_quat(orientations[bs.n3], b1, b2, b3);
 
-            cgdna_bonded_part<true>(ppos, a1, a2, a3, qpos, b1, b2, b3, F, T, grooving, use_oxDNA2_FENE, use_mbf, mbf_xmax, mbf_finf);
+            cgdna_bonded_part<true>(ppos, a1, a2, a3, qpos, b1, b2, b3, dF, dT, grooving, use_oxDNA2_FENE, use_mbf, mbf_xmax, mbf_finf);
 
         }
         if(bs.n5 != P_INVALID) {
@@ -1172,14 +1169,14 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
             c_number4 b1, b2, b3;
             get_vectors_from_quat(orientations[bs.n5], b1, b2, b3);
 
-            cgdna_bonded_part<false>(qpos, b1, b2, b3, ppos, a1, a2, a3, F, T, grooving, use_oxDNA2_FENE, use_mbf, mbf_xmax, mbf_finf);
+            cgdna_bonded_part<false>(qpos, b1, b2, b3, ppos, a1, a2, a3, dF, dT, grooving, use_oxDNA2_FENE, use_mbf, mbf_xmax, mbf_finf);
 
         }
 
-        forces[IND] = F;
-        torques[IND] = T;
-//        LR_atomicAdd(&(forces[IND]), dF);
-//        LR_atomicAdd(&(torques[IND]), dT);
+//        forces[IND] = (dF + F0);
+//        torques[IND] = (dT + T0);
+        LR_atomicAdd(&(forces[IND]), dF);
+        LR_atomicAdd(&(torques[IND]), dT);
         torques[IND] = _vectors_transpose_c_number4_product(a1, a2, a3, torques[IND]);
     } else if (pid == 1){
         //Protein Particles
@@ -1201,19 +1198,16 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
             c_number &gamma = _d_pro_aff_gamma[i];
             c_number &eqdist = _d_pro_aff_eqdist[i];
 
-            c_number fmod = -1.0f * gamma * (d - eqdist) / d;
+            c_number fmod = (-1.0f * gamma) * (d - eqdist) / d;
 
-            F -= fmod * r;
-            F.w += 0.5f * 0.5f * gamma * SQR(d - eqdist);
-//            dF = fmod * r;
-//            dF.w = 0.5f * (0.5f * gamma * SQR(d - eqdist)); //energy is 1/2 since each interaction is computed twice
-//
-//            ftotal -= dF;
+            dF = fmod * r;
+            dF.w = 0.5f * (0.5f * gamma * SQR(d - eqdist)); //energy is 1/2 since each interaction is computed twice
+
+            ftotal -= dF;
         }
 
         //Add totals to particle lists
-        forces[IND] = F
-//        LR_atomicAdd(&(forces[IND]), ftotal);
+        LR_atomicAdd(&(forces[IND]), ftotal);
     } else if (pid == 2) {
         //GS Particles
         //Spring
@@ -1234,19 +1228,16 @@ __global__ void cgdna_forces_edge_bonded(c_number4 *poss, GPU_quat *orientations
             c_number &gamma = _d_gs_aff_gamma[i];
             c_number &eqdist = _d_gs_aff_eqdist[i];
 
-            c_number fmod = -1.0f * gamma * (d - eqdist) / d;
+            c_number fmod = (-1.0f * gamma) * (d - eqdist) / d;
 
-            F -= fmod * r;
-            F.w += 0.5f * 0.5f * gamma * SQR(d - eqdist);
-//            dF = fmod * r;
-//            dF.w = 0.5f * (0.5f * gamma * SQR(d - eqdist)); //energy is 1/2 since each interaction is computed twice
-//
-//            ftotal -= dF;
+            dF = fmod * r;
+            dF.w = 0.5f * (0.5f * gamma * SQR(d - eqdist)); //energy is 1/2 since each interaction is computed twice
+
+            ftotal -= dF;
         }
 
         //Add totals to particle lists
-        forces[IND] = F
-//        LR_atomicAdd(&(forces[IND]), ftotal);
+        LR_atomicAdd(&(forces[IND]), ftotal);
     }
 }
 
