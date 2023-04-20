@@ -43,7 +43,8 @@ std::tuple<std::vector<int>, std::string> Morse::init(input_file &inp) {
 
 	std::string description = Utils::sformat("Morse (D=%g, a=%g, r0=%g, ref_particle=%d, PBC=%d)", _D, _a, _r0, _ref_id, PBC);
 
-    graph_data();
+    // For Debugging
+    // graph_data();
 
 	return std::make_tuple(std::vector<int>{_particle}, description);
 }
