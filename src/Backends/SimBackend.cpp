@@ -89,6 +89,10 @@ SimBackend::~SimBackend() {
 			OX_LOG(Logger::LOG_NOTHING, "\tFor a total of %8.3lg MB/s\n", (total_file + total_stderr) / ((1024.*1024.) * time_passed));
 		}
 	}
+
+	// we explicitly clean up ConfigInfo so that observables are destructed before PluginManager unloads
+	// any dynamically-linked library
+	ConfigInfo::clear();
 }
 
 void SimBackend::get_settings(input_file &inp) {
@@ -101,6 +105,7 @@ void SimBackend::get_settings(input_file &inp) {
 
 	// initialise the timer
 	_mytimer = TimingManager::instance()->new_timer(std::string("SimBackend"));
+	_obs_timer = TimingManager::instance()->new_timer(string("Observables"), string("SimBackend"));
 
 	_interaction = InteractionFactory::make_interaction(inp);
 	_interaction->get_settings(inp);
@@ -569,6 +574,9 @@ void SimBackend::remove_output(std::string output_file) {
 }
 
 void SimBackend::print_observables() {
+	_mytimer->resume();
+	_obs_timer->resume();
+
 	bool someone_ready = false;
 	for(auto const &element : _obs_outputs) {
 		if(element->is_ready(current_step()))
@@ -602,13 +610,18 @@ void SimBackend::print_observables() {
 	}
 
 	_backend_info = std::string("");
+
+	_obs_timer->pause();
+	_mytimer->pause();
 }
 
 void SimBackend::update_observables_data() {
+	_obs_timer->resume();
+
 	bool updated = false;
 	for(auto const &obs : _config_info->observables) {
 		if(obs->need_updating(current_step())) {
-			if(!updated) {
+			if(!updated && obs->require_data_on_CPU()) {
 				apply_simulation_data_changes();
 				updated = true;
 			}
@@ -616,6 +629,8 @@ void SimBackend::update_observables_data() {
 			obs->update_data(current_step());
 		}
 	}
+
+	_obs_timer->pause();
 }
 
 void SimBackend::fix_diffusion() {
@@ -728,6 +743,11 @@ void SimBackend::print_conf(bool reduced, bool only_last) {
 		_obs_output_last_conf->print_output(current_step());
 		if(_obs_output_last_conf_bin != nullptr) {
 			_obs_output_last_conf_bin->print_output(current_step());
+		}
+
+		// serialise the observables
+		for(auto const &obs : _config_info->observables) {
+			obs->serialise();
 		}
 	}
 }

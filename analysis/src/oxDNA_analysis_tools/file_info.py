@@ -64,7 +64,7 @@ def print_info(info, labels):
             print_value(info[k][i], w[j])
         print()
 
-def cli_parser(prog="distance.py"):
+def cli_parser(prog="file_info.py"):
     #handle commandline arguments
     parser = argparse.ArgumentParser(prog = prog, description="Prints metadata about trajectories")
     parser.add_argument('trajectories', type=str, nargs='+', help='One or more trajectories to get information on.')
@@ -84,7 +84,7 @@ def main():
     if args.labels:
         labels = args.labels
         if len(labels) != len(trajectories):
-            raise(RuntimeError, "ERROR: Number of trajectories does not match the number of labels.")
+            raise(RuntimeError, "Number of trajectories does not match the number of labels.")
     else:
         labels = [os.path.basename(t) for t in trajectories]
 

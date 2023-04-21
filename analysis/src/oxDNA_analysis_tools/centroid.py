@@ -119,7 +119,7 @@ def main():
             try:
                 indexes = [int(i) for i in indexes]
             except:
-                print("ERROR: The index file must be a space-seperated list of particles.  These can be generated using oxView by clicking the \"Download Selected Base List\" button")
+                raise RuntimeError("The index file must be a space-seperated list of particles.  These can be generated using oxView by clicking the \"Download Selected Base List\" button")
     else:
         indexes = list(range(top_info.nbases))
 
@@ -140,7 +140,7 @@ def main():
         outfile = "centroid.dat"
         print("INFO: No outfile name provided, defaulting to \"{}\"".format(outfile), file=stderr)
 
-    write_conf(outfile, centroid_candidate)
+    write_conf(outfile, centroid_candidate, include_vel=traj_info.incl_v)
     print("INFO: Wrote centroid to {}".format(outfile), file=stderr)
     print("INFO: Min RMSD: {} nm".format(min_RMSD), file=stderr)
     print("INFO: Centroid time: {}".format(centroid_candidate.time), file=stderr)

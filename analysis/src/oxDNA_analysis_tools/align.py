@@ -8,7 +8,6 @@ from collections import namedtuple
 from oxDNA_analysis_tools.UTILS.data_structures import Configuration
 from oxDNA_analysis_tools.UTILS.oat_multiprocesser import oat_multiprocesser
 from oxDNA_analysis_tools.UTILS.RyeReader import get_confs, describe, inbox, conf_to_str
-start_time = time.time()
 
 ComputeContext = namedtuple("ComputeContext",["traj_info",
                                               "top_info",
@@ -16,7 +15,7 @@ ComputeContext = namedtuple("ComputeContext",["traj_info",
                                               "indexes",
                                               "center"])
 
-def svd_align(ref_coords:np.ndarray, coords:np.ndarray, indexes:List[int], ref_center:np.array=np.array([]), center:bool=True) -> Tuple[np.array]:
+def svd_align(ref_coords:np.ndarray, coords:np.ndarray, indexes:List[int], ref_center:np.array=np.array([]), center:bool=True) -> Tuple[np.ndarray]:
     """
     Single-value decomposition-based alignment of configurations
 
@@ -60,7 +59,7 @@ def compute(ctx:ComputeContext, chunk_size, chunk_id:int):
         confs[i].a1s = c[1]
         confs[i].a3s = c[2]
     #return confs
-    out = ''.join([conf_to_str(c) for c in confs])
+    out = ''.join([conf_to_str(c, include_vel=ctx.traj_info.incl_v) for c in confs])
     return out
 
 def align(traj:str, outfile:str, ncpus:int=1, indexes:List[int]=None, ref_conf:Configuration=None, center:bool=True):
@@ -106,7 +105,6 @@ def align(traj:str, outfile:str, ncpus:int=1, indexes:List[int]=None, ref_conf:C
         oat_multiprocesser(traj_info.nconfs, ncpus, compute, callback, ctx)
     
     print(f"INFO: Wrote aligned trajectory to {outfile}", file=stderr)
-
     return
 
 def cli_parser(prog="align.py"):
@@ -121,6 +119,7 @@ def cli_parser(prog="align.py"):
     return parser
 
 def main():
+    start_time = time.time()
     parser = cli_parser(os.path.basename(__file__))
     args = parser.parse_args()
 
@@ -146,7 +145,7 @@ def main():
             try:
                 indexes = [int(i) for i in indexes]
             except:
-                print("ERROR: The index file must be a space-seperated list of particles.  These can be generated using oxView by clicking the \"Download Selected Base List\" button")
+                raise RuntimeError("The index file must be a space-seperated list of particles.  These can be generated using oxView by clicking the \"Download Selected Base List\" button")
     else: 
         indexes = None
 

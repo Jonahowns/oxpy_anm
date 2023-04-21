@@ -15,28 +15,31 @@ Parameters:
     idxs (list) : The list of starting bytes for configurations in the trajectory
     traj_path (str) : The path to the trajectory
     start (int) : The ID of the first configuration to read in idxs
-    nconfs (int) : How many confs to read
-    nbases (int) : How many bases per conf
+    nconfs (int) : How many confs to read?
+    nbases (int) : How many bases per conf?
+    stride (int) : Return only every this many confs within the chunk.
+    incl_vel (bool) : Are velocities included in the trajectory file?
 """
 @cython.wraparound(False)
 @cython.boundscheck(False)
+@cython.cdivision(True)
 def cget_confs(list idxs, str traj_path, int start, int nconfs, int nbases, bint incl_vel=1):
     # Number of configurations to read
     cdef int conf_count = len(idxs)
-    if (start+nconfs >= conf_count): #this handles the last chunk which may not have nconfs confs remaining.
-        nconfs = conf_count - start
+    cdef int cnconfs = nconfs
+    if (start+cnconfs >= conf_count): #this handles the last chunk which may not have nconfs confs remaining.
+        cnconfs = conf_count - start
 
     # Configuration start/size markers within the chunk
-    cdef int *sizes = <int *> malloc(nconfs * sizeof(int))
-    cdef int *conf_starts = <int *> malloc(nconfs * sizeof(int))
+    cdef int *sizes = <int *> malloc(cnconfs * sizeof(int))
+    cdef int *conf_starts = <int *> malloc(cnconfs * sizeof(int))
     if not sizes or not conf_starts:
-        raise MemoryError("ERROR: Could not allocate memory for the configuration sizes and starts", file=stderr)
-    cdef int chunk_size = 0
-    for i in range(nconfs):
-        sizes[i] = idxs[start+i].size
-        chunk_size += sizes[i]
-        conf_starts[i] = idxs[start+i].offset - idxs[start].offset
+        raise MemoryError("Could not allocate memory for the configuration sizes and starts", file=stderr)
 
+    cdef int chunk_size = idxs[start+cnconfs-1].offset + idxs[start+cnconfs-1].size - idxs[start].offset
+    for i in range(cnconfs):
+        sizes[i] = idxs[start+i].size
+        conf_starts[i] = idxs[start+i].offset - idxs[start].offset
 
     # Convert the path to something C can open
     cdef char *traj_path_c = <char *>malloc(len(traj_path)+1)
@@ -44,8 +47,8 @@ def cget_confs(list idxs, str traj_path, int start, int nconfs, int nbases, bint
     traj_path_c[len(traj_path)] = b'\0'
     cdef FILE *traj_file = fopen(traj_path_c, "rb")
     if traj_file == NULL:
-        print("ERROR: Could not open trajectory file %s" % traj_path, file=stderr)
-        return
+        raise OSError("Could not open trajectory file %s" % traj_path)
+
     fseek(traj_file, idxs[start].offset, 1)
 
     # Read in the current chunk
@@ -53,8 +56,8 @@ def cget_confs(list idxs, str traj_path, int start, int nconfs, int nbases, bint
     fread(chunk, chunk_size, 1, traj_file)
 
     # Parse the chunk into Configurations
-    cdef list confs = [None]*nconfs
-    for i in range(nconfs):
+    cdef list confs = [None]*cnconfs
+    for i in range(cnconfs):
         c = parse_conf(chunk, conf_starts[i], sizes[i], nbases, incl_vel)
         confs[i] = c
 

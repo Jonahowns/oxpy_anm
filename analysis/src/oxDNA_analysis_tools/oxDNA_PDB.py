@@ -52,8 +52,7 @@ def align(full_base, ox_base):
             full_base.rotate(R)
 
 def cli_parser(prog="oxDNA_PDB.py"):
-    parser = argparse.ArgumentParser(prog=os.path.basename(
-        __file__), description="Convert oxDNA files to PDB.  This converter can handle oxDNANM protein simulation files.")
+    parser = argparse.ArgumentParser(prog=prog, description="Convert oxDNA files to PDB.  This converter can handle oxDNANM protein simulation files.")
     parser.add_argument('topology', type=str, nargs=1,
                         help='the oxDNA topology file for the structure')
     parser.add_argument('configuration', type=str, nargs=1,
@@ -138,13 +137,11 @@ def main():
                 # .json format from oat deviations
                 substrings = f.read().split("[")[1].split("]")[0].split(",")
             except Exception as e:
-                print("ERROR: Parsing error in RMSF file. Invalid Format: %s" % e, file=sys.stderr)
-                exit(1)
+                raise RuntimeError("Parsing error in RMSF file. Invalid Format: %s" % e)
             try:
                 rmsf_per_nucleotide = {i: float(s) for i, s in enumerate(substrings)}
             except Exception as e:
-                print("ERROR: Parsing error in RMSF file. Conversion to float failed : %s" % e, file=sys.stderr)
-                exit(1)
+                raise RuntimeError("Parsing error in RMSF file. Conversion to float failed : %s" % e)
     else:
         rmsf_per_nucleotide = defaultdict(lambda: 1.00)
 
@@ -197,8 +194,7 @@ def main():
                 else:
                      reading_position = next_reading_position
             elif strand.id < 0 and not protein_pdb_files:
-                print("ERROR: You must provide the PDB files for proteins in the scene")
-                exit(1)
+                raise RuntimeError("You must provide the PDB files for proteins in the scene.")
 
             # Nucleic Acids
             elif strand.id >= 0:
