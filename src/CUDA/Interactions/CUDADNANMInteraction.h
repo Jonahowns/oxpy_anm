@@ -31,6 +31,8 @@ public:
     float _debye_huckel_B; // prefactor of the quadratic cut-off
     float _minus_kappa;
 
+    int *_d_is_strand_end = nullptr;
+
     float _pro_backbone_sigma, _pro_backbone_rstar, _pro_backbone_b, _pro_backbone_rcut, _pro_backbone_sqr_rcut;
     float _pro_base_sigma, _pro_base_rstar, _pro_base_b, _pro_base_rcut, _pro_base_sqr_rcut;
     float _pro_rstar, _pro_b, _pro_rcut, _pro_sqr_rcut, _pro_sigma;
@@ -55,11 +57,12 @@ public:
     virtual ~CUDADNANMInteraction();
 
     void get_settings(input_file &inp);
-    void cuda_init(c_number box_side, int N);
+    void cuda_init(int N);
     c_number get_cuda_rcut() {
         return this->get_rcut();
     }
     virtual void _on_T_update();
+    virtual void _init_strand_ends(LR_bonds *d_bonds);
 
     virtual void compute_forces(CUDABaseList *lists, c_number4 *d_poss, GPU_quat *d_qorientations, c_number4 *d_forces, c_number4 *d_torques, LR_bonds *d_bonds, CUDABox *d_box);
 };

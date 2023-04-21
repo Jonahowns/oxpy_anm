@@ -62,6 +62,8 @@ CUDACGDNAInteraction::CUDACGDNAInteraction(bool btp) : CGDNAInteraction(btp), CU
 
     _h_gs_other_exc_vol_params = NULL;
     _d_gs_other_exc_vol_params = NULL;
+
+    _edge_compatible = true;
 }
 
 
@@ -120,8 +122,8 @@ void CUDACGDNAInteraction::get_settings(input_file &inp) {
 }
 
 
-void CUDACGDNAInteraction::cuda_init(c_number box_side, int N) {
-    CUDABaseInteraction::cuda_init(box_side, N);
+void CUDACGDNAInteraction::cuda_init(int N) {
+    CUDABaseInteraction::cuda_init(N);
     CGDNAInteraction::init();
 
     std::fstream top;
@@ -644,5 +646,5 @@ void CUDACGDNAInteraction::compute_forces(CUDABaseList *lists, c_number4 *d_poss
 }
 
 void CUDACGDNAInteraction::_on_T_update() {
-    cuda_init(_box_side, _N);
+    cuda_init(_N);
 }

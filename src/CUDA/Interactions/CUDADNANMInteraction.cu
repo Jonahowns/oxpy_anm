@@ -5,8 +5,9 @@
 
 #include "CUDADNANMInteraction.h"
 #include "CUDA_DNANM.cuh"
-#include "../Lists/CUDASimpleVerletList.h"
-#include "../Lists/CUDANoList.h"
+//#include "CUDA_DNA.cuh"
+//#include "../Lists/CUDASimpleVerletList.h"
+//#include "../Lists/CUDANoList.h"
 #include "../../Interactions/DNANMInteraction.h"
 
 
@@ -40,6 +41,11 @@ CUDADNANMInteraction::CUDADNANMInteraction(bool btp) : DNANMInteraction(btp), CU
 
     _spring_param_size_number = 0;
     _ang_param_size = 0;
+
+    _edge_compatible = true;
+    _use_debye_huckel = false;
+    _use_oxDNA2_coaxial_stacking = false;
+    _use_oxDNA2_FENE = false;
 }
 
 
@@ -64,6 +70,10 @@ CUDADNANMInteraction::~CUDADNANMInteraction() {
     if(_h_aff_gamma != NULL) delete[] _h_aff_gamma;
     if(_h_aff_eqdist != NULL) delete[] _h_aff_eqdist;
     if(_h_affected_indx != NULL) delete[] _h_affected_indx;
+
+    if(_d_is_strand_end != nullptr) {
+        CUDA_SAFE_CALL(cudaFree(_d_is_strand_end));
+    }
 }
 
 
@@ -80,11 +90,33 @@ void CUDADNANMInteraction::get_settings(input_file &inp) {
         throw oxDNAException("Key 'topology_file' not found.");
     }
     DNANMInteraction::get_settings(inp);
+
+    _use_debye_huckel = true;
+    _use_oxDNA2_coaxial_stacking = true;
+    _use_oxDNA2_FENE = true;
+
+    // we don't need the F4_... terms as the macros are used in the CUDA_DNA.cuh file; this doesn't apply for the F2_K term
+    F2_K[1] = CXST_K_OXDNA2;
+    _debye_huckel_half_charged_ends = true;
+    this->_grooving = true;
+    // end copy from DNA2Interaction
+
+    // copied from DNA2Interaction::get_settings() (CPU), the least bad way of doing things
+    getInputNumber(&inp, "salt_concentration", &_salt_concentration, 1);
+    getInputBool(&inp, "dh_half_charged_ends", &_debye_huckel_half_charged_ends, 0);
+
+    // lambda-factor (the dh length at T = 300K, I = 1.0)
+    _debye_huckel_lambdafactor = 0.3616455f;
+    getInputFloat(&inp, "dh_lambda", &_debye_huckel_lambdafactor, 0);
+
+    // the prefactor to the Debye-Huckel term
+    _debye_huckel_prefactor = 0.0543f;
+    getInputFloat(&inp, "dh_strength", &_debye_huckel_prefactor, 0);
 }
 
 
-void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
-    CUDABaseInteraction::cuda_init(box_side, N);
+void CUDADNANMInteraction::cuda_init(int N) {
+    CUDABaseInteraction::cuda_init(N);
     DNANMInteraction::init();
 
 //    Addition of Reading Parameter File -> Moved from get_settings due to needing to fill variables that are filled in the CPU version of DNANMInteraction::read_topology
@@ -277,7 +309,7 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
 
         //Allocation and copying of Indice List for accessing compressed parameters
         CUDA_SAFE_CALL(cudaMalloc(&_d_affected_indx, (this->npro+1)*sizeof(int)));
-        CUDA_SAFE_CALL( cudaMemcpy(_d_affected_indx, _h_affected_indx, (this->npro+1)*sizeof(int), cudaMemcpyHostToDevice));
+        CUDA_SAFE_CALL(cudaMemcpy(_d_affected_indx, _h_affected_indx, (this->npro+1)*sizeof(int), cudaMemcpyHostToDevice));
 
         if(_angular) {
             //Parameters for Bending/Torsional, _h_ang_params is filled in parameter file reading
@@ -341,14 +373,43 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
     COPY_ARRAY_TO_CONSTANT(MD_F5_PHI_XS, this->F5_PHI_XS, 4);
 
 
-    if(this->_use_edge) CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_n_forces, &this->_n_forces, sizeof(int)) );
+    if(this->_use_edge) CUDA_SAFE_CALL(cudaMemcpyToSymbol(MD_n_forces, &this->_n_forces, sizeof(int)));
 
-    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_RC, &_debye_huckel_RC, sizeof(float)) );
-    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_RHIGH, &_debye_huckel_RHIGH, sizeof(float)) );
-    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_prefactor, &_debye_huckel_prefactor, sizeof(float)) );
-    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_B, &_debye_huckel_B, sizeof(float)) );
-    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_minus_kappa, &_minus_kappa, sizeof(float)) );
-    CUDA_SAFE_CALL( cudaMemcpyToSymbol(MD_dh_half_charged_ends, &_debye_huckel_half_charged_ends, sizeof(bool)) );
+    // copied from DNA2Interaction::init() (CPU), the least bad way of doing things
+    // We wish to normalise with respect to T=300K, I=1M. 300K=0.1 s.u. so divide this->_T by 0.1
+    c_number lambda = _debye_huckel_lambdafactor * sqrt(this->_T / 0.1f) / sqrt(_salt_concentration);
+    // RHIGH gives the distance at which the smoothing begins
+    _debye_huckel_RHIGH = 3.0 * lambda;
+    _minus_kappa = -1.0 / lambda;
+
+    // these are just for convenience for the smoothing parameter computation
+    c_number x = _debye_huckel_RHIGH;
+    c_number q = _debye_huckel_prefactor;
+    c_number l = lambda;
+
+    // compute the some smoothing parameters
+    _debye_huckel_B = -(exp(-x / l) * q * q * (x + l) * (x + l)) / (-4. * x * x * x * l * l * q);
+    _debye_huckel_RC = x * (q * x + 3. * q * l) / (q * (x + l));
+
+    c_number debyecut;
+    if (this->_grooving) {
+        debyecut = 2.0f * sqrt(SQR(POS_MM_BACK1) + SQR(POS_MM_BACK2)) + _debye_huckel_RC;
+    } else {
+        debyecut = 2.0f * sqrt(SQR(POS_BACK)) + _debye_huckel_RC;
+    }
+    // the cutoff radius for the potential should be the larger of rcut and debyecut
+    if (debyecut > this->_rcut) {
+        this->_rcut = debyecut;
+        this->_sqr_rcut = debyecut * debyecut;
+    }
+    // End copy from DNA2Interaction
+
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(MD_dh_RC, &_debye_huckel_RC, sizeof(float)));
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(MD_dh_RHIGH, &_debye_huckel_RHIGH, sizeof(float)));
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(MD_dh_prefactor, &_debye_huckel_prefactor, sizeof(float)));
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(MD_dh_B, &_debye_huckel_B, sizeof(float)));
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(MD_dh_minus_kappa, &_minus_kappa, sizeof(float)));
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(MD_dh_half_charged_ends, &_debye_huckel_half_charged_ends, sizeof(bool)));
 
     //Constants for DNA/Protein Excluded Volume Interactions
     //Backbone-Protein Excluded Volume Parameters
@@ -408,47 +469,87 @@ void CUDADNANMInteraction::cuda_init(c_number box_side, int N) {
 }
 
 void CUDADNANMInteraction::compute_forces(CUDABaseList *lists, c_number4 *d_poss, GPU_quat *d_orientations, c_number4 *d_forces, c_number4 *d_torques, LR_bonds *d_bonds, CUDABox *d_box) {
-    CUDASimpleVerletList *_v_lists = dynamic_cast<CUDASimpleVerletList *>(lists);
-    if(_v_lists != NULL) {
-        if (_v_lists->use_edge()) {
-            if(_angular) {
-                dnanm_forces_edge_nonbonded_angular
-                <<<(_v_lists->N_edges - 1) / (this->_launch_cfg.threads_per_block) +
-                   1, this->_launch_cfg.threads_per_block>>>
-                        (d_poss, d_orientations, this->_d_edge_forces, this->_d_edge_torques, _v_lists->d_edge_list,
-                         _v_lists->N_edges, d_bonds, this->_grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking,
-                         d_box);
-            } else {
-                dnanm_forces_edge_nonbonded
-                <<<(_v_lists->N_edges - 1) / (this->_launch_cfg.threads_per_block) +
-                   1, this->_launch_cfg.threads_per_block>>>
-                        (d_poss, d_orientations, this->_d_edge_forces, this->_d_edge_torques, _v_lists->d_edge_list,
-                         _v_lists->N_edges, d_bonds, this->_grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking,
-                         d_box);
-            }
+//    CUDASimpleVerletList *_v_lists = dynamic_cast<CUDASimpleVerletList *>(lists);
+//    if(_v_lists != NULL) {
+//        if (_v_lists->use_edge()) {
+//            if(_angular) {
+//                dnanm_forces_edge_nonbonded_angular
+//                <<<(_v_lists->N_edges - 1) / (this->_launch_cfg.threads_per_block) +
+//                   1, this->_launch_cfg.threads_per_block>>>
+//                        (d_poss, d_orientations, this->_d_edge_forces, this->_d_edge_torques, _v_lists->d_edge_list,
+//                         _v_lists->N_edges, d_bonds, this->_grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking,
+//                         d_box);
+//            } else {
+//                dnanm_forces_edge_nonbonded
+//                <<<(_v_lists->N_edges - 1) / (this->_launch_cfg.threads_per_block) +
+//                   1, this->_launch_cfg.threads_per_block>>>
+//                        (d_poss, d_orientations, this->_d_edge_forces, this->_d_edge_torques, _v_lists->d_edge_list,
+//                         _v_lists->N_edges, d_bonds, this->_grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking,
+//                         d_box);
+//            }
+//
+//            this->_sum_edge_forces_torques(d_forces, d_torques);
+//
+//            // potential for removal here
+//            cudaThreadSynchronize();
+//            CUT_CHECK_ERROR("forces_second_step error -- after non-bonded");
+    if(_d_is_strand_end == nullptr) {
+        _init_strand_ends(d_bonds);
+    }
 
-            this->_sum_edge_forces_torques(d_forces, d_torques);
 
-            // potential for removal here
-            cudaThreadSynchronize();
-            CUT_CHECK_ERROR("forces_second_step error -- after non-bonded");
+    if(_update_st) {
+        CUDA_SAFE_CALL(cudaMemset(_d_st, 0, _N * sizeof(CUDAStressTensor)));
+    }
 
-            if(_angular){
-                dnanm_forces_edge_bonded_angular
-                        <<< this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >>>
-                (d_poss, d_orientations, d_forces, d_torques, d_bonds, this->_grooving, _use_oxDNA2_FENE, this->_use_mbf, this->_mbf_xmax, this->_mbf_finf, d_box, _d_aff_eqdist, _d_aff_gamma, _d_ang_params, _d_ang_kbkt, _d_affected_indx, _d_affected);
+    if(_use_edge) {
 
-            } else {
-                dnanm_forces_edge_bonded
-                        <<< this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >>>
-                (d_poss, d_orientations, d_forces, d_torques, d_bonds, this->_grooving, _use_oxDNA2_FENE, this->_use_mbf, this->_mbf_xmax, this->_mbf_finf, d_box, _d_aff_eqdist, _d_aff_gamma, _d_affected_indx, _d_affected);
-            }
+        if(_n_forces == 1) { // we can directly use d_forces and d_torques so that no sum is required
+            dnanm_forces_edge_nonbonded
+            <<<(lists->N_edges - 1)/(_launch_cfg.threads_per_block) + 1, _launch_cfg.threads_per_block>>>
+                    (d_poss, d_orientations, d_forces, d_torques, lists->d_edge_list, lists->N_edges, _d_is_strand_end,
+                     _grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking, _update_st, _d_st, d_box);
+        }
+        else { // sum required, somewhat slower
+            dnanm_forces_edge_nonbonded
+            <<<(lists->N_edges - 1)/(_launch_cfg.threads_per_block) + 1, _launch_cfg.threads_per_block>>>
+                    (d_poss, d_orientations, _d_edge_forces, _d_edge_torques, lists->d_edge_list, lists->N_edges, _d_is_strand_end,
+                     _grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking, _update_st, _d_st, d_box);
 
-        } else throw oxDNAException("Edge Approach is only implemented for DNANM Interaction using CUDA approach. Please add use_edge = 1 to your input file.");
+            _sum_edge_forces_torques(d_forces, d_torques);
+        }
 
-    } else throw oxDNAException("Must Use with Lists to run simulation");
+        dna_forces_edge_bonded_dnanm
+        <<<_launch_cfg.blocks, _launch_cfg.threads_per_block>>>
+                (d_poss, d_orientations, d_forces, d_torques, d_bonds, _grooving, _use_oxDNA2_FENE, _use_mbf, _mbf_xmax,
+                 _mbf_finf, _update_st, _d_st);
+
+        protein_forces_edge_bonded
+        <<<_launch_cfg.blocks, _launch_cfg.threads_per_block>>>
+                (d_poss, d_orientations, d_forces, d_torques, d_bonds, _grooving, _use_oxDNA2_FENE, _use_mbf, _mbf_xmax,
+                 _mbf_finf, d_box, _update_st, _d_st, _d_aff_eqdist, _d_aff_gamma, _d_affected_indx, _d_affected);
+    } else throw oxDNAException("Edge Approach is only implemented for DNANM Interaction using CUDA approach. Please add use_edge = 1 to your input file.");
+
+
+//            if(_angular){
+//                dnanm_forces_edge_bonded_angular
+//                        <<< this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >>>
+//                (d_poss, d_orientations, d_forces, d_torques, d_bonds, this->_grooving, _use_oxDNA2_FENE, this->_use_mbf, this->_mbf_xmax, this->_mbf_finf, d_box, _d_aff_eqdist, _d_aff_gamma, _d_ang_params, _d_ang_kbkt, _d_affected_indx, _d_affected);
+//
+//            } else {
+//                dnanm_forces_edge_bonded
+//                        <<< this->_launch_cfg.blocks, this->_launch_cfg.threads_per_block >>>
+//                (d_poss, d_orientations, d_forces, d_torques, d_bonds, this->_grooving, _use_oxDNA2_FENE, this->_use_mbf, this->_mbf_xmax, this->_mbf_finf, d_box, _d_aff_eqdist, _d_aff_gamma, _d_affected_indx, _d_affected);
+//            }
+
+//    } else throw oxDNAException("Must Use with Lists to run simulation");
 }
 
 void CUDADNANMInteraction::_on_T_update() {
-    cuda_init(_box_side, _N);
+    cuda_init(_N);
+}
+
+void CUDADNANMInteraction::_init_strand_ends(LR_bonds *d_bonds) {
+    CUDA_SAFE_CALL(GpuUtils::LR_cudaMalloc<int>(&_d_is_strand_end, sizeof(int) * _N));
+    dna_init_DNA_strand_ends<<<_launch_cfg.blocks, _launch_cfg.threads_per_block>>>(_d_is_strand_end, d_bonds, _N);
 }

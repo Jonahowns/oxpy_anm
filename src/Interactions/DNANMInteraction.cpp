@@ -280,7 +280,7 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
             if (strlen(aminoacid) == 1) {
                 p->type = Utils::decode_aa(aminoacid[0]);
-                p->btype = 1; // btype of 1 means AA
+                p->btype = Utils::decode_aa(aminoacid[0]);; // btype of 1 means AA
             }
 
             p->mass = masses[p->type];
@@ -309,7 +309,7 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
             // the base can be either a char or an integer
             if (strlen(base) == 1) {
                 p->type = Utils::decode_base(base[0]);
-                p->btype = 0;
+                p->btype = Utils::decode_base(base[0]);
 
             } else {
                 throw oxDNAException("Only DNA Base Characters Permitted in DNA Strand in Topology");
@@ -350,19 +350,14 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
 
 number DNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
-    int interaction_type = p->btype + q->btype;
+    int interaction_type = get_id(p->btype) + get_id(q->btype);
 
-    if (interaction_type == 0){
+    if (interaction_type == 0 | interaction_type == 2){
         if(p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     }
     if (interaction_type == 1) return this->pair_interaction_nonbonded(p, q, compute_r, update_forces);
 
-    if (interaction_type == 2){
-        // ANM & ANMT call same functions here
-        if (p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
-        else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
-    }
     return 0.f;
 }
 
@@ -372,7 +367,7 @@ number DNANMInteraction::pair_interaction_bonded(BaseParticle *p, BaseParticle *
         if (q != P_VIRTUAL && p != P_VIRTUAL)
             _computed_r = this->_box->min_image(p->pos, q->pos);
 
-    int interaction_type = p->btype + q->btype;
+    int interaction_type = get_id(p->btype) + get_id(q->btype);
     if (interaction_type == 0){ // dna-dna
         if(!this->_check_bonded_neighbour(&p, &q, compute_r)) return (number) 0;
         number energy = _backbone(p,q,compute_r,update_forces);
@@ -405,7 +400,7 @@ number DNANMInteraction::pair_interaction_nonbonded(BaseParticle *p, BaseParticl
 
     number rnorm = _computed_r.norm();
 
-    int interaction_type = p->btype + q->btype;
+    int interaction_type = get_id(p->btype) + get_id(q->btype);
 
     if (interaction_type == 0) { //DNA-DNA Interaction
         if (rnorm >= _sqr_rcut) return (number) 0.f;
@@ -437,14 +432,16 @@ number DNANMInteraction::_protein_dna_exc_volume(BaseParticle *p, BaseParticle *
 
     LR_vector force(0, 0, 0);
     LR_vector rcenter = _computed_r;
+    int pid = get_id(p->btype);
+    int qid = get_id(q->btype);
 
-    if(p->btype == 0 && q->btype == 1)
+    if(pid == 0 && qid == 1)
     {
         //rcenter = -rcenter;
         protein = q;
         nuc = p;
     }
-    else if (p->btype == 1 && q->btype == 0)
+    else if (pid == 1 && qid == 0)
     {
         rcenter = -rcenter;
         protein = p;
@@ -698,6 +695,9 @@ void DNANMInteraction::load_massfile(std::string &filename) {
         throw oxDNAException("Could Not Load Mass File, Aborting");
 }
 
+int DNANMInteraction::get_id(int btype){
+    return (btype <= 4) ? 0: 1;
+};
 
 DNANMInteraction::~DNANMInteraction() = default;
 

@@ -58,6 +58,7 @@ public:
     std::string _massfile;
     bool _angular;
 
+    int get_id(int btype);
     explicit DNANMInteraction(bool btp); //btn controls whether bending/torsion potential is applied
     virtual void load_massfile(std::string &filename);
     ~DNANMInteraction() override;
