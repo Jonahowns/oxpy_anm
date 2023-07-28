@@ -766,9 +766,8 @@ number DNAInteraction::_hydrogen_bonding(BaseParticle *p, BaseParticle *q, bool 
 	}
 
 	// true if p and q are Watson-Crick-like pairs
-	bool is_pair = (q->type + p->type == 3);
-	//number hb_multi = (abs(q->btype) >= 300 && abs(p->btype) >= 300) ? _hb_multiplier : 1.f;
-	number hb_multi = _hb_multiplier;
+	bool is_pair = (q->btype + p->btype == 3);
+	number hb_multi = (abs(q->btype) >= 300 && abs(p->btype) >= 300) ? _hb_multiplier : 1.f;
 
 	LR_vector rhydro = _computed_r + q->int_centers[DNANucleotide::BASE] - p->int_centers[DNANucleotide::BASE];
 	number rhydromod = rhydro.module();

@@ -469,30 +469,6 @@ void CUDADNANMInteraction::cuda_init(int N) {
 }
 
 void CUDADNANMInteraction::compute_forces(CUDABaseList *lists, c_number4 *d_poss, GPU_quat *d_orientations, c_number4 *d_forces, c_number4 *d_torques, LR_bonds *d_bonds, CUDABox *d_box) {
-//    CUDASimpleVerletList *_v_lists = dynamic_cast<CUDASimpleVerletList *>(lists);
-//    if(_v_lists != NULL) {
-//        if (_v_lists->use_edge()) {
-//            if(_angular) {
-//                dnanm_forces_edge_nonbonded_angular
-//                <<<(_v_lists->N_edges - 1) / (this->_launch_cfg.threads_per_block) +
-//                   1, this->_launch_cfg.threads_per_block>>>
-//                        (d_poss, d_orientations, this->_d_edge_forces, this->_d_edge_torques, _v_lists->d_edge_list,
-//                         _v_lists->N_edges, d_bonds, this->_grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking,
-//                         d_box);
-//            } else {
-//                dnanm_forces_edge_nonbonded
-//                <<<(_v_lists->N_edges - 1) / (this->_launch_cfg.threads_per_block) +
-//                   1, this->_launch_cfg.threads_per_block>>>
-//                        (d_poss, d_orientations, this->_d_edge_forces, this->_d_edge_torques, _v_lists->d_edge_list,
-//                         _v_lists->N_edges, d_bonds, this->_grooving, _use_debye_huckel, _use_oxDNA2_coaxial_stacking,
-//                         d_box);
-//            }
-//
-//            this->_sum_edge_forces_torques(d_forces, d_torques);
-//
-//            // potential for removal here
-//            cudaThreadSynchronize();
-//            CUT_CHECK_ERROR("forces_second_step error -- after non-bonded");
     if(_d_is_strand_end == nullptr) {
         _init_strand_ends(d_bonds);
     }

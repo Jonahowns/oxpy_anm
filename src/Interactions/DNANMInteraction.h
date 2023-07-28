@@ -65,6 +65,7 @@ public:
     void get_settings(input_file &inp) override;
     void allocate_particles(std::vector<BaseParticle *> &particles) override;
     void read_topology(int *N_strands, std::vector<BaseParticle *> &particles) override;
+    void read_parameter_file(std::vector<BaseParticle *> &particles);
 
     number pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) override;
     number pair_interaction_bonded(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces) override;

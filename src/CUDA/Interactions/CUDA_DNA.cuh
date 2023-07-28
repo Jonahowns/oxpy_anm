@@ -410,9 +410,9 @@ __device__ void _particle_particle_DNA_interaction(const c_number4 &r, const c_n
 		bool p_is_end, bool q_is_end) {
 	int ptype = get_particle_type(ppos);
 	int qtype = get_particle_type(qpos);
-	//int pbtype = get_particle_btype(ppos);
-	//int qbtype = get_particle_btype(qpos);
-	int int_type = ptype + qtype;
+	int pbtype = get_particle_btype(ppos);
+	int qbtype = get_particle_btype(qpos);
+	int int_type = pbtype + qbtype;
 
 	c_number4 ppos_back = (grooving) ? POS_MM_BACK1 * a1 + POS_MM_BACK2 * a2 : POS_BACK * a1;
 	c_number4 ppos_base = POS_BASE * a1;
@@ -465,7 +465,7 @@ __device__ void _particle_particle_DNA_interaction(const c_number4 &r, const c_n
 	c_number4 rhydro = r + qpos_base - ppos_base;
 	c_number rhydromodsqr = CUDA_DOT(rhydro, rhydro);
 	if(int_type == 3 && SQR(HYDR_RCLOW) < rhydromodsqr && rhydromodsqr < SQR(HYDR_RCHIGH)) {
-		c_number hb_multi = (abs(qtype) >= 300 && abs(ptype) >= 300) ? MD_hb_multi[0] : 1.f;
+		c_number hb_multi = (abs(qbtype) >= 300 && abs(pbtype) >= 300) ? MD_hb_multi[0] : 1.f;
 		// versor and magnitude of the base-base separation
 		c_number rhydromod = sqrtf(rhydromodsqr);
 		c_number4 rhydrodir = rhydro / rhydromod;
@@ -920,9 +920,9 @@ __global__ void hb_op_precalc(c_number4 *poss, GPU_quat *orientations, int *op_p
 	// check whether hb energy is below a certain threshold for this nucleotide pair
 	int ptype = get_particle_type(ppos);
 	int qtype = get_particle_type(qpos);
-	//int pbtype = get_particle_btype(ppos);
-	//int qbtype = get_particle_btype(qpos);
-	int int_type = ptype + qtype;
+	int pbtype = get_particle_btype(ppos);
+	int qbtype = get_particle_btype(qpos);
+	int int_type = pbtype + qbtype;
 
 	GPU_quat po = orientations[pind];
 	GPU_quat qo = orientations[qind];
@@ -982,11 +982,9 @@ __global__ void near_hb_op_precalc(c_number4 *poss, GPU_quat *orientations, int 
 	// check whether hb energy is below a certain threshold for this nucleotide pair
 	int ptype = get_particle_type(ppos);
 	int qtype = get_particle_type(qpos);
-	//int pbtype = get_particle_btype(ppos);
-	//int qbtype = get_particle_btype(qpos);
-
-    //changed since btype and type were doing almost the same thing. Freed up btype to be used by other interactions
-	int int_type = ptype + qtype;
+	int pbtype = get_particle_btype(ppos);
+	int qbtype = get_particle_btype(qpos);
+	int int_type = pbtype + qbtype;
 
 	GPU_quat po = orientations[pind];
 	GPU_quat qo = orientations[qind];

@@ -80,8 +80,11 @@ void DNANMInteraction::get_settings(input_file &inp){
         OX_LOG(Logger::LOG_INFO, "Using Provided Massfile");
         load_massfile(_massfile);
     }
-    //Addition of Reading Parameter File
+}
 
+
+void DNANMInteraction::read_parameter_file(std::vector<BaseParticle*> &particles){
+    //Addition of Reading Parameter File
     auto valid_spring_params = [](int N, int x, int y, double d, char s, double k){
         if(x < 0 || x > N) throw oxDNAException("Invalid Particle ID %d in Parameter File", x);
         if(y < 0 || y > N) throw oxDNAException("Invalid Particle ID %d in Parameter File", y);
@@ -116,6 +119,18 @@ void DNANMInteraction::get_settings(input_file &inp){
             while (parameters >> key1 >> key2 >> dist >> potswitch >> potential)
             {
                 valid_spring_params(N, key1, key2, dist, potswitch, potential);
+                if (_angular) {
+                    auto *q = dynamic_cast< ANMTParticle * > (particles[key1]);
+                    if (key1 < key2) {
+                        q->add_bonded_neighbor(particles[key2]);
+                    }
+                } else {
+                    auto *q = dynamic_cast< ANMParticle * > (particles[key1]);
+                    if (key1 < key2) {
+                        q->add_bonded_neighbor(particles[key2]);
+                    }
+                }
+
                 spring_connection_num += 1;
 
                 //If DNACT
@@ -261,23 +276,6 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
                 myneighs.insert(x);
             }
 
-            if (_angular) {
-                auto *q = dynamic_cast< ANMTParticle * > (p);
-                for(auto & k : myneighs){
-                    if (p->index < k) {
-                        q->add_bonded_neighbor(particles[k]);
-                    }
-                }
-
-            } else {
-                auto *q = dynamic_cast< ANMParticle * > (p);
-                for(auto & k : myneighs){
-                    if (p->index < k) {
-                        q->add_bonded_neighbor(particles[k]);
-                    }
-                }
-            }
-
             if (strlen(aminoacid) == 1) {
                 p->type = Utils::decode_aa(aminoacid[0]);
                 p->btype = Utils::decode_aa(aminoacid[0]);; // btype of 1 means AA
@@ -332,7 +330,6 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
         }
         if (strand == 0) throw oxDNAException("No strand 0 should be present please check topology file");
-
     }
 
 
@@ -346,13 +343,15 @@ void DNANMInteraction::read_topology(int *N_strands, std::vector<BaseParticle*> 
 
     *N_strands = my_N_strands;
 
+    // read parameter file
+    read_parameter_file(particles);
 }
 
 
 number DNANMInteraction::pair_interaction(BaseParticle *p, BaseParticle *q, bool compute_r, bool update_forces){
     int interaction_type = get_id(p->btype) + get_id(q->btype);
 
-    if (interaction_type == 0 | interaction_type == 2){
+    if (interaction_type == 0 || interaction_type == 2){
         if(p->is_bonded(q)) return pair_interaction_bonded(p, q, compute_r, update_forces);
         else return pair_interaction_nonbonded(p, q, compute_r, update_forces);
     }
@@ -696,6 +695,9 @@ void DNANMInteraction::load_massfile(std::string &filename) {
 }
 
 int DNANMInteraction::get_id(int btype){
+    // takes btype return whether dna or protein
+    // 0 is dna
+    // >=5 is protein
     return (btype <= 4) ? 0: 1;
 };
 

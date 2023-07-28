@@ -76,7 +76,7 @@ void CGDNAInteraction::allocate_particles(std::vector<BaseParticle*> &particles)
         // ignore -1 topology_order is initialized with
     }
 
-    assert(n == particles.size);
+    assert(n == particles.size());
 
 }
 
